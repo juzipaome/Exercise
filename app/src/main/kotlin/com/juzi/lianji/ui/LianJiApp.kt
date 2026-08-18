@@ -75,11 +75,11 @@ fun LianJiApp(vm: MainViewModel) {
     fun animatedPop(){if(stack.size>1)stack.removeAt(stack.lastIndex)}
     val renderScreen: @Composable (AppScreen) -> Unit = { current -> when(val s=current) {
         AppScreen.Main -> MainTabs(vm, mainPage, { mainPage = it }, onNavigate=::push)
-        AppScreen.NewPlan -> PlanEditorScreen(vm,onBack=::animatedPop,onSave={animatedPop()}) { id -> vm.start(id){animatedPop();push(AppScreen.Workout(it))} }
-        is AppScreen.EditPlan -> PlanEditorScreen(vm,s.id,::animatedPop,{animatedPop()}) { id -> vm.start(id){animatedPop();push(AppScreen.Workout(it))} }
+        AppScreen.NewPlan -> PlanEditorScreen(vm,onBack=::animatedPop,onSave={animatedPop()},onSaveAndStart={id->vm.start(id){animatedPop();push(AppScreen.Workout(it))}},onDetail={push(AppScreen.ExerciseDetail(it))})
+        is AppScreen.EditPlan -> PlanEditorScreen(vm,s.id,::animatedPop,{animatedPop()},{id->vm.start(id){animatedPop();push(AppScreen.Workout(it))}},{push(AppScreen.ExerciseDetail(it))})
         AppScreen.NewExercise -> CustomExerciseScreen(vm,::animatedPop)
         is AppScreen.ExerciseDetail -> ExerciseDetailScreen(vm,s.id,::animatedPop)
-        is AppScreen.Workout -> WorkoutScreen(vm,s.id,::animatedPop,onAddExercise={push(AppScreen.AddWorkoutExercise(s.id))})
+        is AppScreen.Workout -> WorkoutScreen(vm,s.id,::animatedPop,onAddExercise={push(AppScreen.AddWorkoutExercise(s.id))},onExerciseDetail={push(AppScreen.ExerciseDetail(it))})
         is AppScreen.AddWorkoutExercise -> WorkoutExercisePickerScreen(vm,s.id,::animatedPop)
         is AppScreen.Day -> DayDetailScreen(vm,s.date,::animatedPop)
         is AppScreen.MonthAnalytics -> MonthAnalyticsScreen(vm,YearMonth.parse(s.month),::animatedPop)

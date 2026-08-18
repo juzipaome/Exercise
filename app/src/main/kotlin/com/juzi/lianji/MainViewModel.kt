@@ -16,12 +16,14 @@ data class MainUiState(
     val sessions: List<WorkoutSessionEntity> = emptyList(),
     val days: List<DaySummary> = emptyList(),
     val active: WorkoutSessionEntity? = null,
+    val personalBests: Map<String, ExercisePersonalBest> = emptyMap(),
     val settings: AppSettings = AppSettings(),
 )
 
 private data class StartupState(
     val plans: List<PlanSummary>,
     val active: WorkoutSessionEntity?,
+    val personalBests: List<ExercisePersonalBest>,
     val settings: AppSettings,
 )
 
@@ -33,8 +35,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val startupState = combine(
         repository.plans,
         repository.activeSession,
+        repository.personalBests,
         settingsStore.settings,
-    ) { plans, active, settings -> StartupState(plans, active, settings) }
+    ) { plans, active, personalBests, settings -> StartupState(plans, active, personalBests, settings) }
 
     val state: StateFlow<MainUiState> = combine(
         startupState,
@@ -51,6 +54,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             sessions = sessions,
             days = days,
             active = startup.active,
+            personalBests = startup.personalBests.associateBy { it.exerciseId },
             settings = startup.settings,
         )
     }

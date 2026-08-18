@@ -33,6 +33,7 @@ interface WorkoutRepository {
     val activeSession: Flow<WorkoutSessionEntity?>
     val sessions: Flow<List<WorkoutSessionEntity>>
     val days: Flow<List<DaySummary>>
+    val personalBests: Flow<List<ExercisePersonalBest>>
     fun session(sessionId: Long): Flow<WorkoutSessionEntity?>
     fun rows(sessionId: Long): Flow<List<SessionSetRow>>
     fun sessionExercises(sessionId: Long): Flow<List<SessionExerciseEntity>>
@@ -101,6 +102,7 @@ class LianJiRepository(private val db: LianJiDatabase) : ExerciseRepository, Pla
     override val activeSession = db.sessionDao().observeActive()
     override val sessions = db.sessionDao().observeAll()
     override val days = db.sessionDao().observeDaySummaries()
+    override val personalBests = db.sessionDao().observePersonalBests()
     override fun session(sessionId: Long) = db.sessionDao().observeSession(sessionId)
     override fun rows(sessionId: Long) = db.sessionDao().observeRows(sessionId)
     override fun sessionExercises(sessionId: Long) = db.sessionDao().observeSessionExercises(sessionId)

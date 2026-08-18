@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -19,12 +20,14 @@ import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Info
 
 @Composable
-fun PlanEditorScreen(vm:MainViewModel,planId:Long?=null,onBack:()->Unit,onSave:(Long)->Unit,onSaveAndStart:(Long)->Unit) {
+fun PlanEditorScreen(vm:MainViewModel,planId:Long?=null,onBack:()->Unit,onSave:(Long)->Unit,onSaveAndStart:(Long)->Unit,onDetail:(String)->Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
-    var name by remember{mutableStateOf("")};var query by remember{mutableStateOf("")};var body by remember{mutableStateOf("")};var favoriteOnly by remember{mutableStateOf(false)};var selected by remember{mutableStateOf(listOf<String>())}
-    var loaded by remember(planId){mutableStateOf(planId==null)}
+    var name by rememberSaveable{mutableStateOf("")};var query by rememberSaveable{mutableStateOf("")};var body by rememberSaveable{mutableStateOf("")};var favoriteOnly by rememberSaveable{mutableStateOf(false)};var selected by rememberSaveable{mutableStateOf(listOf<String>())}
+    var loaded by rememberSaveable(planId){mutableStateOf(planId==null)}
     LaunchedEffect(planId){planId?.let{vm.loadPlan(it){plan,ids->name=plan.name;selected=ids;loaded=true}}}
     val bodies=remember(state.exercises){state.exercises.map{it.bodyPart}.distinct().sortedBy(::bodyPartLabel)}
     val visible=state.exercises.filter{(query.isBlank()||it.nameZh.contains(query,true)||it.nameEn.contains(query,true))&&(body.isBlank()||it.bodyPart==body)&&(!favoriteOnly||it.isFavorite)}
@@ -39,7 +42,7 @@ fun PlanEditorScreen(vm:MainViewModel,planId:Long?=null,onBack:()->Unit,onSave:(
             item{TextField(query,{query=it},label="搜索动作",useLabelAsPlaceholder=true,modifier=Modifier.cardPadding().fillMaxWidth())}
             item{LazyRow(contentPadding=PaddingValues(horizontal=12.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){item{PlanFilter("已收藏",favoriteOnly){favoriteOnly=!favoriteOnly}};item{PlanFilter("全部",body.isBlank()){body=""}};items(bodies){part->PlanFilter(bodyPartLabel(part),body==part){body=part}}};Spacer(Modifier.height(8.dp))}
             item{SmallTitle("已选 ${selected.size} 个动作 · 当前 ${visible.size} 个结果")}
-            items(visible,key={it.id}){ex->val checked=ex.id in selected;ExerciseChoice(ex,checked){selected=if(checked)selected-ex.id else selected+ex.id}}
+            items(visible,key={it.id}){ex->val checked=ex.id in selected;ExerciseChoice(ex,checked,{onDetail(ex.id)}){selected=if(checked)selected-ex.id else selected+ex.id}}
         }
     }
 }
@@ -76,7 +79,7 @@ fun WorkoutExercisePickerScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit)
 
 @Composable private fun PlanFilter(label:String,selected:Boolean,onClick:()->Unit){if(selected)Button(onClick=onClick){Text(label)}else TextButton(label,onClick=onClick)}
 
-@Composable private fun ExerciseChoice(ex:ExerciseEntity,checked:Boolean,onToggle:()->Unit){
+@Composable private fun ExerciseChoice(ex:ExerciseEntity,checked:Boolean,onDetail:()->Unit,onToggle:()->Unit){
     val rowToggle=hapticRowClick(checked,onToggle)
     Card(modifier=Modifier.cardPadding(),pressFeedbackType=PressFeedbackType.Sink,onClick=rowToggle){
         Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
@@ -84,6 +87,7 @@ fun WorkoutExercisePickerScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit)
             if(media!=null)AsyncImage("file:///android_asset/$media",null,Modifier.size(76.dp).squircleClip(16.dp),contentScale=ContentScale.Crop)
             else Spacer(Modifier.size(76.dp))
             Column(Modifier.weight(1f)){Text(ex.nameZh,style=MiuixTheme.textStyles.title3);Text(ex.nameEn,maxLines=1,color=MiuixTheme.colorScheme.onSurfaceSecondary);Text("${bodyPartLabel(ex.bodyPart)} · ${equipmentLabel(ex.equipment)} · ${if(ex.isCardio)"计时" else "组数/重量"}",color=MiuixTheme.colorScheme.onSurfaceSecondary)}
+            IconButton(onClick=onDetail){Icon(MiuixIcons.Info,"查看动作详情")}
             Checkbox(state=if(checked)ToggleableState.On else ToggleableState.Off,onClick=rowToggle)
         }
     }
