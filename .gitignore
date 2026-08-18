@@ -1,0 +1,29 @@
+*.iml
+.gradle/
+.kotlin/
+.idea/
+.fleet/
+local.properties
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.jks
+*.keystore
+*.apk
+*.aab
+*.hprof
+.DS_Store
+Thumbs.db
+
+# Local shallow clone of the latest official MIUIX source.
+/references/miuix/
+
+# Local UIAutomator dumps and ad-hoc acceptance captures belong in captures/.
+/*.xml
+/*.png
+
+# Exercise media is used locally under the applicable permission, but is not
+# included in the public source repository.
+app/src/main/assets/exercise_dataset/images/
+app/src/main/assets/exercise_dataset/videos/

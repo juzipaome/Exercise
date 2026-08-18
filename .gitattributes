@@ -1,0 +1,13 @@
+* text=auto
+
+*.kt text eol=lf
+*.kts text eol=lf
+*.sh text eol=lf
+gradlew text eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Optional local exercise media may use Git LFS during private development;
+# the media directories remain ignored and are not part of the public tree.
+app/src/main/assets/exercise_dataset/**/*.gif filter=lfs diff=lfs merge=lfs -text
+app/src/main/assets/exercise_dataset/**/*.jpg filter=lfs diff=lfs merge=lfs -text
