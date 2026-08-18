@@ -4,6 +4,7 @@
 .idea/
 .fleet/
 local.properties
+keystore.properties
 **/build/
 captures/
 .externalNativeBuild/
