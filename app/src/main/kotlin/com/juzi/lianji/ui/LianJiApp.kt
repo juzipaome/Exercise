@@ -5,8 +5,6 @@ import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.MutatePriority
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
@@ -146,9 +144,7 @@ private fun MainTabs(vm:MainViewModel,selectedPage:Int,onSelectedPage:(Int)->Uni
             Scaffold(
                 modifier=Modifier.weight(1f),
                 bottomBar={ if(!wide) Box(
-                    Modifier
-                        .textureBlur(backdrop=backdrop,shape=RectangleShape,blurRadius=25f,colors=navigationBarBlurColors)
-                        .clickable(interactionSource=remember{MutableInteractionSource()},indication=null,onClick={}),
+                    Modifier.textureBlur(backdrop=backdrop,shape=RectangleShape,blurRadius=25f,colors=navigationBarBlurColors),
                 ) { NavigationBar(color=Color.Transparent) { labels.forEachIndexed { i,label -> NavigationBarItem(selected=mainPagerState.selectedPage==i,onClick={mainPagerState.animateToPage(i)},icon=icons[i],label=label) } } } },
             ) { padding ->
                 Box(Modifier.fillMaxSize().layerBackdrop(backdrop)) {

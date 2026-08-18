@@ -1,6 +1,5 @@
 package com.juzi.lianji.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -85,7 +84,7 @@ fun WorkoutExercisePickerScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit)
             if(media!=null)AsyncImage("file:///android_asset/$media",null,Modifier.size(76.dp).squircleClip(16.dp),contentScale=ContentScale.Crop)
             else Spacer(Modifier.size(76.dp))
             Column(Modifier.weight(1f)){Text(ex.nameZh,style=MiuixTheme.textStyles.title3);Text(ex.nameEn,maxLines=1,color=MiuixTheme.colorScheme.onSurfaceSecondary);Text("${bodyPartLabel(ex.bodyPart)} · ${equipmentLabel(ex.equipment)} · ${if(ex.isCardio)"计时" else "组数/重量"}",color=MiuixTheme.colorScheme.onSurfaceSecondary)}
-            Checkbox(state=if(checked)ToggleableState.On else ToggleableState.Off,onClick=onToggle)
+            Checkbox(state=if(checked)ToggleableState.On else ToggleableState.Off,onClick=rowToggle)
         }
     }
 }

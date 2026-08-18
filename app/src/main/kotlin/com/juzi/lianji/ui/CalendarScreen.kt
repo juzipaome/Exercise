@@ -1,15 +1,14 @@
 package com.juzi.lianji.ui
 
 import androidx.compose.animation.*
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -47,7 +46,78 @@ import java.time.format.DateTimeFormatter
         item{Card(Modifier.cardPadding()){Column(Modifier.padding(horizontal=10.dp,vertical=12.dp)){
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){PreviousButton{monthValue=month.minusMonths(1).toString()};Text(month.format(DateTimeFormatter.ofPattern("yyyy年 M月")),style=MiuixTheme.textStyles.title2);NextButton{monthValue=month.plusMonths(1).toString()}}
             Row(Modifier.fillMaxWidth()){listOf("一","二","三","四","五","六","日").forEach{Text(it,Modifier.weight(1f),textAlign=TextAlign.Center,color=MiuixTheme.colorScheme.onSurfaceSecondary)}}
-            repeat(6){week->Row(Modifier.fillMaxWidth()){repeat(7){column->val day=week*7+column-offset+1;if(day in 1..month.lengthOfMonth()){val date=month.atDay(day).toString();val entries=summaries[date].orEmpty();Column(Modifier.weight(1f).height(70.dp).squircleClip(14.dp).clickable{onDay(date)}.padding(horizontal=1.dp,vertical=4.dp),horizontalAlignment=Alignment.CenterHorizontally){Text(day.toString());entries.take(2).forEach{entry->val completedEntry=entry.status=="COMPLETED";Text(entry.title,Modifier.fillMaxWidth().padding(top=1.dp).squircleClip(6.dp).background(if(completedEntry)StatusColors.Healthy.copy(alpha=.14f) else StatusColors.Warning.copy(alpha=.14f)).padding(horizontal=1.dp,vertical=1.dp),style=MiuixTheme.textStyles.footnote2.copy(fontSize=9.sp,letterSpacing=(-0.35).sp),maxLines=1,textAlign=TextAlign.Center,color=if(completedEntry)StatusColors.Healthy else StatusColors.Warning)};if(entries.size>2)Text("+${entries.size-2}",style=MiuixTheme.textStyles.footnote2,color=MiuixTheme.colorScheme.onSurfaceSecondary)} }else Spacer(Modifier.weight(1f).height(70.dp))}}}
+            repeat(6) { week ->
+                Row(Modifier.fillMaxWidth()) {
+                    repeat(7) { column ->
+                        val day = week * 7 + column - offset + 1
+                        if (day in 1..month.lengthOfMonth()) {
+                            val date = month.atDay(day).toString()
+                            val entries = summaries[date].orEmpty()
+                            Surface(
+                                onClick = { onDay(date) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(70.dp)
+                                    .padding(horizontal = 1.dp, vertical = 2.dp),
+                                shape = RoundedCornerShape(14.dp),
+                                color = Color.Transparent,
+                                shadowElevation = 0.dp,
+                            ) {
+                                Column(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 1.dp, vertical = 2.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                ) {
+                                    Text(day.toString())
+                                    entries.take(2).forEach { entry ->
+                                        val completedEntry = entry.status == "COMPLETED"
+                                        Surface(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 1.dp),
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = if (completedEntry) {
+                                                StatusColors.Healthy.copy(alpha = .14f)
+                                            } else {
+                                                StatusColors.Warning.copy(alpha = .14f)
+                                            },
+                                            shadowElevation = 0.dp,
+                                        ) {
+                                            Text(
+                                                entry.title,
+                                                Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 1.dp, vertical = 1.dp),
+                                                style = MiuixTheme.textStyles.footnote2.copy(
+                                                    fontSize = 9.sp,
+                                                    letterSpacing = (-0.35).sp,
+                                                ),
+                                                maxLines = 1,
+                                                textAlign = TextAlign.Center,
+                                                color = if (completedEntry) {
+                                                    StatusColors.Healthy
+                                                } else {
+                                                    StatusColors.Warning
+                                                },
+                                            )
+                                        }
+                                    }
+                                    if (entries.size > 2) {
+                                        Text(
+                                            "+${entries.size - 2}",
+                                            style = MiuixTheme.textStyles.footnote2,
+                                            color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Spacer(Modifier.weight(1f).height(70.dp))
+                        }
+                    }
+                }
+            }
         }}}
     }
 }
@@ -123,9 +193,11 @@ private fun SessionHistoryCard(vm:MainViewModel,session:WorkoutSessionEntity) {
     val seconds=((session.endedAt?:System.currentTimeMillis())-session.startedAt)/1000
     Card(Modifier.cardPadding()) {
         Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            Row(Modifier.fillMaxWidth().squircleClip(14.dp).clickable(indication=null,interactionSource=remember{MutableInteractionSource()}){expanded=!expanded}.padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically) {
+            Surface(onClick={expanded=!expanded},modifier=Modifier.fillMaxWidth().padding(vertical=4.dp),shape=RoundedCornerShape(14.dp),color=Color.Transparent,shadowElevation=0.dp) {
+                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)){Text(session.planNameSnapshot,style=MiuixTheme.textStyles.title2);Text("${if(session.status=="COMPLETED")"已完成" else "进行中"} · ${groups.size} 个动作 · ${formatDuration(seconds)}",color=MiuixTheme.colorScheme.onSurfaceSecondary)}
                 IconButton(onClick={expanded=!expanded}){Icon(if(expanded)MiuixIcons.ExpandLess else MiuixIcons.ExpandMore,if(expanded)"收起详情" else "展开详情")}
+                }
             }
             AnimatedVisibility(expanded,enter=expandVertically(animationSpec=folmeSpring(.9f,.32f))+fadeIn(folmeSpring(.9f,.28f)),exit=shrinkVertically(animationSpec=folmeSpring(.92f,.28f))+fadeOut(folmeSpring(.95f,.24f))) {
                 Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
