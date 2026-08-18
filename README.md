@@ -34,12 +34,10 @@ Debug APK 输出到 `app/build/outputs/apk/debug/app-debug.apk`。
 
 - `app/`：Android 应用、Room 数据层、Compose UI 与离线动作元数据。
 - `app/src/main/assets/exercise_dataset/images/` 和 `videos/`：本地可选媒体目录，已被 `.gitignore` 排除，不随公开源码发布。
-- `references/miuix/`：跟踪官方 `main` 的 MIUIX 源码参考，不参与应用构建。
 - `tools/`：数据校验与资源生成工具。
 
 ## 数据与许可
 
 - 动作元数据及说明来自 [hasaneyldrm/exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset)，MIT License。
 - 180×180 图片与 GIF：© Gym visual — https://gymvisual.com/ 。由于授权范围限制，媒体文件不包含在本仓库中；如需本地使用，请自行取得授权并放入上述目录。
-- UI 使用 [MIUIX](https://github.com/compose-miuix-ui/miuix) 0.9.4-rc01，Apache-2.0。
-- 本地组件源码放在 `references/miuix/`，跟踪官方最新 `main`，不参与 App 构建或主仓库提交。缺失时运行 `git clone --depth 1 https://github.com/compose-miuix-ui/miuix.git references/miuix`。
+- UI 引用了 [MIUIX](https://github.com/compose-miuix-ui/miuix)。
