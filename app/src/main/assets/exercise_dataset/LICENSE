@@ -27,12 +27,12 @@ MEDIA EXCEPTION
 The MIT license above covers ONLY the code, tooling, dataset structure, and
 instruction text/translations in this repository.
 
-It DOES NOT cover the exercise media in the `images/` and `videos/`
-directories. That media is © Gym visual (https://gymvisual.com/) and is
-included here with the rights holder's written permission, at 180×180
+It DOES NOT cover exercise media in the `images/` and `videos/` directories.
+Those directories are intentionally omitted from this public source
+repository. If such media is present in a separate private authorized
+checkout, it is © Gym visual (https://gymvisual.com/), is limited to 180×180
 resolution, and must retain the attribution "© Gym visual —
 https://gymvisual.com/". Its use and reuse are governed by Gym visual's Terms
 & Conditions (https://gymvisual.com/content/3-terms-and-conditions-of-use) and
-by `NOTICE.md` in this repository — NOT by the MIT license above. Cloning this
-repository does not grant you any license to the media; obtain your own from
-Gym visual.
+by `NOTICE.md` — NOT by the MIT license above. Cloning this repository does not
+grant you any license to the media; obtain your own from Gym visual.
