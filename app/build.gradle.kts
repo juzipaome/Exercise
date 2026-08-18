@@ -11,6 +11,11 @@ val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties().apply {
     if (keystorePropertiesFile.exists()) keystorePropertiesFile.inputStream().use(::load)
 }
+val missingKeystoreProperties = listOf("storeFile","storePassword","keyAlias","keyPassword")
+    .filter { keystoreProperties.getProperty(it).isNullOrBlank() }
+require(!keystorePropertiesFile.exists() || missingKeystoreProperties.isEmpty()) {
+    "keystore.properties 缺少配置：${missingKeystoreProperties.joinToString()}"
+}
 
 android {
     namespace = "com.juzi.lianji"

@@ -136,7 +136,6 @@ data class MonthlyExerciseStat(
 )
 data class ExercisePersonalBest(
     val exerciseId: String,
-    val trackingMode: String,
     val maxWeightKg: Double,
     val maxReps: Int,
     val maxDistanceKm: Double,
