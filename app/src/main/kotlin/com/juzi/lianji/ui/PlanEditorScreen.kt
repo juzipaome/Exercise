@@ -28,7 +28,7 @@ fun PlanEditorScreen(vm:MainViewModel,planId:Long?=null,onBack:()->Unit,onSave:(
     val state by vm.state.collectAsStateWithLifecycle()
     var name by rememberSaveable{mutableStateOf("")};var query by rememberSaveable{mutableStateOf("")};var body by rememberSaveable{mutableStateOf("")};var favoriteOnly by rememberSaveable{mutableStateOf(false)};var selected by rememberSaveable{mutableStateOf(listOf<String>())}
     var loaded by rememberSaveable(planId){mutableStateOf(planId==null)}
-    LaunchedEffect(planId){planId?.let{vm.loadPlan(it){plan,ids->name=plan.name;selected=ids;loaded=true}}}
+    LaunchedEffect(planId,loaded){if(planId!=null&&!loaded)vm.loadPlan(planId){plan,ids->name=plan.name;selected=ids;loaded=true}}
     val bodies=remember(state.exercises){state.exercises.map{it.bodyPart}.distinct().sortedBy(::bodyPartLabel)}
     val visible=state.exercises.filter{(query.isBlank()||it.nameZh.contains(query,true)||it.nameEn.contains(query,true))&&(body.isBlank()||it.bodyPart==body)&&(!favoriteOnly||it.isFavorite)}
     val canSave=name.isNotBlank()&&selected.isNotEmpty()
