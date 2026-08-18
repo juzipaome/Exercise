@@ -36,6 +36,7 @@ import com.juzi.lianji.data.nextWorkoutSet
 import com.juzi.lianji.data.orderedWorkoutGroups
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.squircle.squircleClip
@@ -115,13 +116,13 @@ private fun CardioWorkoutCard(records:List<SessionSetRow>,now:Long,onDetail:()->
 
 @Composable
 private fun CardioRecordRow(record:SessionSetRow,now:Long,onBegin:()->Unit,onPause:()->Unit,onComplete:(Double)->Unit,onEdit:(Int,Double)->Unit,onDelete:()->Unit){
-    var distance by remember(record.setId,record.distanceKm){mutableStateOf(if(record.distanceKm>0)trimDecimal(record.distanceKm) else "")}
-    var minutes by remember(record.setId,record.durationSeconds){mutableStateOf(if(record.durationSeconds>0)trimDecimal(record.durationSeconds/60.0) else "")}
+    var distance by remember(record.setId,record.distanceKm){mutableStateOf(if(record.distanceKm>0)exactDecimal(record.distanceKm) else "")}
+    var minutes by remember(record.setId,record.durationSeconds){mutableStateOf(if(record.durationSeconds>0)minutesForEdit(record.durationSeconds) else "")}
     var editing by remember(record.setId){mutableStateOf(false)}
     val active=record.startedAt!=null&&!record.completed;val paused=record.pausedAt!=null;val elapsed=if(record.completed)record.durationSeconds.toLong()else activeDurationSeconds(record.startedAt,now,record.pausedAt,record.pausedDurationMillis)
     when{
         active->Column(verticalArrangement=Arrangement.spacedBy(10.dp)){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(if(paused)"已暂停" else "进行中",style=MiuixTheme.textStyles.title3,color=MiuixTheme.colorScheme.primary);Text(formatDuration(elapsed),style=MiuixTheme.textStyles.title1)};IconButton(onClick=onDelete){Icon(MiuixIcons.Delete,"删除记录")}};TextField(distance,{distance=it},label="距离（km，可选）",keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),modifier=Modifier.fillMaxWidth());Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)){Button(onClick=if(paused)onBegin else onPause,modifier=Modifier.weight(1f)){Icon(if(paused)MiuixIcons.Play else MiuixIcons.Pause,if(paused)"继续" else "暂停");Text(if(paused)"继续" else "暂停")};Button(onClick={onComplete(distance.toDoubleOrNull()?:0.0)},colors=ButtonDefaults.buttonColorsPrimary(),modifier=Modifier.weight(1f)){Text("结束并保存")}}}
-        editing->Column(verticalArrangement=Arrangement.spacedBy(10.dp)){Text("修改有氧记录",style=MiuixTheme.textStyles.title3);Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){TextField(minutes,{minutes=it},label="时长（分钟）",keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),modifier=Modifier.weight(1f));TextField(distance,{distance=it},label="距离（km）",keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),modifier=Modifier.weight(1f))};Button(onClick={onEdit(((minutes.toDoubleOrNull()?:0.0)*60).toInt(),distance.toDoubleOrNull()?:0.0);editing=false},modifier=Modifier.fillMaxWidth()){Text("保存修改")}}
+        editing->Column(verticalArrangement=Arrangement.spacedBy(10.dp)){Text("修改有氧记录",style=MiuixTheme.textStyles.title3);Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){TextField(minutes,{minutes=it},label="时长（分钟）",keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),modifier=Modifier.weight(1f));TextField(distance,{distance=it},label="距离（km）",keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),modifier=Modifier.weight(1f))};Button(onClick={onEdit(minutesToSeconds(minutes),distance.toDoubleOrNull()?:0.0);editing=false},modifier=Modifier.fillMaxWidth()){Text("保存修改")}}
         record.completed->Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(cardioSummary(record),style=MiuixTheme.textStyles.title3);Text("已完成",color=MiuixTheme.colorScheme.primary)};IconButton(onClick={editing=true}){Icon(MiuixIcons.Edit,"编辑有氧记录")}}
         else->Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("准备开始",style=MiuixTheme.textStyles.title3);Text("自动记录运动时长，结束时可填写距离",color=MiuixTheme.colorScheme.onSurfaceSecondary)};IconButton(onClick=onBegin){Icon(MiuixIcons.Play,"开始有氧")};IconButton(onClick=onDelete){Icon(MiuixIcons.Delete,"删除记录")}}
     }
@@ -146,5 +147,7 @@ private fun CardioRecordRow(record:SessionSetRow,now:Long,onBegin:()->Unit,onPau
 fun formatRestLabel(seconds:Int)=if(seconds<60)"${seconds} 秒" else if(seconds%60==0)"${seconds/60} 分钟" else "${seconds/60} 分 ${seconds%60} 秒"
 
 fun formatDuration(seconds:Long):String=if(seconds>=3600)"%d:%02d:%02d".format(seconds/3600,seconds/60%60,seconds%60)else"%02d:%02d".format(seconds/60,seconds%60)
-fun cardioSummary(record:SessionSetRow):String=buildString{append(formatDuration(record.durationSeconds.toLong()));if(record.distanceKm>0)append(" · ${trimDecimal(record.distanceKm)} km");if(record.distanceKm>0&&record.durationSeconds>0){val pace=record.durationSeconds/60.0/record.distanceKm;append(" · ${pace.toInt()}:${((pace%1)*60).toInt().toString().padStart(2,'0')} /km")}}
+fun minutesForEdit(seconds:Int)=displayDecimal(seconds/60.0)
+fun minutesToSeconds(minutes:String)=((minutes.toDoubleOrNull()?:0.0)*60).roundToInt()
+fun cardioSummary(record:SessionSetRow):String=buildString{append(formatDuration(record.durationSeconds.toLong()));if(record.distanceKm>0)append(" · ${displayDecimal(record.distanceKm)} km");if(record.distanceKm>0&&record.durationSeconds>0){val pace=record.durationSeconds/60.0/record.distanceKm;append(" · ${pace.toInt()}:${((pace%1)*60).toInt().toString().padStart(2,'0')} /km")}}
 private fun notifyRest(context:Context,vibration:Boolean,sound:Boolean){if(vibration)context.getSystemService(Vibrator::class.java)?.vibrate(VibrationEffect.createOneShot(350,VibrationEffect.DEFAULT_AMPLITUDE));if(ContextCompat.checkSelfPermission(context,Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)context.getSystemService(NotificationManager::class.java).notify(90,NotificationCompat.Builder(context,"rest_timer").setSmallIcon(android.R.drawable.ic_lock_idle_alarm).setContentTitle("休息结束").setContentText("准备开始下一组").setPriority(NotificationCompat.PRIORITY_HIGH).setSilent(!sound).build())}

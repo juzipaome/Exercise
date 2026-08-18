@@ -11,5 +11,10 @@ class LabelsTest {
         assertEquals("PB · 最高 100 kg · 最多 12 次 · 最远 5.25 km · 最久 30:00",personalBestLabel(ExercisePersonalBest("mixed",100.0,12,5.25,1800)))
     }
 
-    @Test fun decimal_labels_round_to_two_places()=assertEquals("0.02",trimDecimal(1/60.0))
+    @Test fun decimal_labels_round_to_two_places()=assertEquals("0.02",displayDecimal(1/60.0))
+
+    @Test fun cardio_edit_values_round_trip_without_precision_loss() {
+        assertEquals("5.1234",exactDecimal(5.1234))
+        assertEquals(62,minutesToSeconds(minutesForEdit(62)))
+    }
 }

@@ -12,11 +12,12 @@ fun personalBestLabel(best:ExercisePersonalBest?):String {
     if(best.maxWeightKg<=0&&best.maxReps<=0&&best.maxDistanceKm<=0&&best.maxDurationSeconds<=0)return "PB · 暂无有效记录"
     return buildString {
         append("PB")
-        if(best.maxWeightKg>0)append(" · 最高 ${trimDecimal(best.maxWeightKg)} kg")
+        if(best.maxWeightKg>0)append(" · 最高 ${displayDecimal(best.maxWeightKg)} kg")
         if(best.maxReps>0)append(" · 最多 ${best.maxReps} 次")
-        if(best.maxDistanceKm>0)append(" · 最远 ${trimDecimal(best.maxDistanceKm)} km")
+        if(best.maxDistanceKm>0)append(" · 最远 ${displayDecimal(best.maxDistanceKm)} km")
         if(best.maxDurationSeconds>0)append(" · 最久 ${formatDuration(best.maxDurationSeconds.toLong())}")
     }
 }
 
-fun trimDecimal(value:Double)=BigDecimal.valueOf(value).setScale(2,RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+fun displayDecimal(value:Double)=BigDecimal.valueOf(value).setScale(2,RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+fun exactDecimal(value:Double)=BigDecimal.valueOf(value).stripTrailingZeros().toPlainString()
