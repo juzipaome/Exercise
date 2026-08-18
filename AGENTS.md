@@ -25,7 +25,7 @@ Debug APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。
 
 - `app/src/main/kotlin/com/juzi/lianji/ui/`：页面与通用 UI。
 - `app/src/main/kotlin/com/juzi/lianji/data/`：Room、Repository、导入和备份。
-- `app/src/main/assets/exercise_dataset/`：固定的 1,324 条离线动作及媒体。
+- `app/src/main/assets/exercise_dataset/`：固定的 1,324 条离线动作元数据及本地可选媒体。
 - `references/miuix/`：跟踪官方 `main` 的本地 MIUIX 参考源码，不参与 App 构建或主仓库提交。
 - `tools/`：数据完整性检查；UI 验收截图放 `captures/`，不要堆在项目根目录。
 - 整个项目 UI 必须统一使用当前 Maven 已发布的 MIUIX 版本，不得新增 Material UI 组件、自绘已有 MIUIX 图标、自建或仿制 MIUIX 已提供的控件；需要核对最新实现时优先查看 `references/miuix/` 及其中的 `example/`，实际调用必须确认已包含在 App 当前依赖版本中。
@@ -38,5 +38,5 @@ Debug APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。
 
 ## 当前状态
 
-四个主 Tab、计划、日程、训练组计时/休息、历史、自定义动作、主题和 JSON 备份已接通。
+四个主 Tab、计划、日程、训练组计时/休息、历史、自定义动作、主题和 JSON 备份已接通；计划编辑和训练中可查看动作详情，已完成记录会自动汇总力量与有氧 PB，并集中显示在动作详情页。
 当前单元测试和 Debug 构建通过；Compose 仪器化测试尚未建立，添加首个测试时再引入对应依赖。

@@ -56,6 +56,18 @@ interface SessionDao {
     @Query("SELECT * FROM workout_sessions WHERE id=:id") suspend fun getSession(id: Long): WorkoutSessionEntity?
     @Query("SELECT * FROM workout_sessions WHERE id=:id") fun observeSession(id: Long): Flow<WorkoutSessionEntity?>
     @Query("""
+        SELECT se.exerciseId,
+               e.trackingMode,
+               MAX(ws.weightKg) maxWeightKg,
+               MAX(ws.reps) maxReps,
+               MAX(ws.distanceKm) maxDistanceKm,
+               MAX(ws.durationSeconds) maxDurationSeconds
+        FROM session_exercises se
+        JOIN workout_sets ws ON ws.sessionExerciseId = se.id AND ws.completed = 1
+        JOIN exercises e ON e.id = se.exerciseId
+        GROUP BY se.exerciseId, e.trackingMode
+    """) fun observePersonalBests(): Flow<List<ExercisePersonalBest>>
+    @Query("""
         SELECT se.exerciseNameSnapshot exerciseName,
                COALESCE(e.bodyPart, 'other') bodyPart,
                COUNT(ws.id) completedSets,

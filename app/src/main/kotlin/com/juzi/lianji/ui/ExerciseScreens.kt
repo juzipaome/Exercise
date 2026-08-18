@@ -50,7 +50,7 @@ fun ExerciseLibraryScreen(state:MainUiState,padding:PaddingValues,onDetail:(Stri
 
 @Composable
 fun ExerciseDetailScreen(vm:MainViewModel,id:String,onBack:()->Unit){
-    val ex by vm.repository.exercise(id).collectAsStateWithLifecycle(null);var showRename by remember{mutableStateOf(false)}
+    val ex by vm.repository.exercise(id).collectAsStateWithLifecycle(null);val state by vm.state.collectAsStateWithLifecycle();var showRename by remember{mutableStateOf(false)}
     MiuixPageScaffold(title="动作详情",navigationIcon={BackButton(onBack)}){pad->
         LazyColumn(contentPadding=PaddingValues(top=pad.calculateTopPadding()+12.dp,bottom=24.dp)){ex?.let{e->item{
             Card(Modifier.cardPadding()){Column{
@@ -58,7 +58,7 @@ fun ExerciseDetailScreen(vm:MainViewModel,id:String,onBack:()->Unit){
                 Column(Modifier.padding(18.dp)){
                     Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(e.nameZh,style=MiuixTheme.textStyles.title1);Text(e.nameEn,color=MiuixTheme.colorScheme.onSurfaceSecondary)};IconButton(onClick={showRename=true}){Icon(MiuixIcons.Edit,"修改中文名")}}
                     if(!e.isCustom&&e.datasetNameZh.isNotBlank()&&e.nameZh!=e.datasetNameZh)Text("数据集原名：${e.datasetNameZh}",color=MiuixTheme.colorScheme.onSurfaceSecondary)
-                    Spacer(Modifier.height(10.dp));Text("${bodyPartLabel(e.bodyPart)} · ${equipmentLabel(e.equipment)} · ${e.target}")
+                    Spacer(Modifier.height(10.dp));Text("${bodyPartLabel(e.bodyPart)} · ${equipmentLabel(e.equipment)} · ${e.target}");Text(personalBestLabel(state.personalBests[e.id]),color=MiuixTheme.colorScheme.primary)
                     Spacer(Modifier.height(18.dp));Text("动作说明",style=MiuixTheme.textStyles.title3);Text(e.instructionsZh.ifBlank{e.instructionsEn})
                     Spacer(Modifier.height(18.dp));Text(e.attribution,color=MiuixTheme.colorScheme.onSurfaceSecondary)
                 }

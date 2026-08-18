@@ -134,6 +134,14 @@ data class MonthlyExerciseStat(
     val volume: Double,
     val trackingMode: String = TrackingMode.STRENGTH,
 )
+data class ExercisePersonalBest(
+    val exerciseId: String,
+    val trackingMode: String,
+    val maxWeightKg: Double,
+    val maxReps: Int,
+    val maxDistanceKm: Double,
+    val maxDurationSeconds: Int,
+)
 data class SessionSetRow(
     val setId: Long,
     val sessionExerciseId: Long,
