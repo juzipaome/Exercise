@@ -1,43 +1,40 @@
 # 练迹
 
-一个仅 Android、纯本地离线的健身计划与训练记录 App，使用 Kotlin、Jetpack Compose、Room 与 MIUIX。
+练迹是一款仅支持 Android、离线优先的个人健身计划与训练记录 App。动作数据内置在应用中，运行时无需联网获取。
 
-当前已接通计划创建、日程安排、力量训练组与休息计时、有氧时长/距离记录、历史日历、离线动作库、自定义动作、动作中文显示名修改、主题设置及 JSON 备份恢复。计划编辑和训练中均可查看动作详情；已完成记录会自动汇总力量与有氧 PB，并集中显示在动作详情页。训练历史保存独立快照，不会随计划模板或动作显示名修改。
+## 功能
+
+- 创建训练计划，并按日期安排训练
+- 记录力量训练的组数、重量、次数和休息时间
+- 记录有氧训练的时长、距离和配速
+- 浏览离线动作库，查看动作说明和个人最佳记录（PB）
+- 通过日历回顾训练历史和月度数据
+- 支持自定义动作、主题设置及 JSON 备份恢复
+
+## 环境要求
+
+- Android 15（API 35）及以上
+- JDK 21
+- Android SDK 37
 
 ## 构建
 
-本机配置使用 Android Studio 自带 JBR、Android API 37 编译平台，运行目标保持 Android API 36：
+克隆项目并使用 Android Studio 打开，或在项目根目录执行：
 
 ```powershell
-$env:JAVA_HOME='D:\Software\JetBrains\Android Studio\jbr'
-$env:ANDROID_HOME='D:\Software\Android\Sdk'
-.\gradlew.bat testDebugUnitTest assembleDebug
+.\gradlew.bat assembleDebug
 ```
 
-Debug APK 输出到 `app/build/outputs/apk/debug/app-debug.apk`。
+macOS / Linux：
 
-验证内置动作数量、ID 和署名：
-
-```powershell
-.\tools\validate_exercise_dataset.ps1
+```bash
+./gradlew assembleDebug
 ```
 
-如果你在本地拥有已获授权的动作媒体，也可以额外验证图片和 GIF：
+生成的 APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。
 
-```powershell
-.\tools\validate_exercise_dataset.ps1 -RequireMedia
-```
+## 第三方内容
 
-项目协作边界和目录约定见 `AGENTS.md`。
-
-## 目录
-
-- `app/`：Android 应用、Room 数据层、Compose UI 与离线动作元数据。
-- `app/src/main/assets/exercise_dataset/images/` 和 `videos/`：本地可选媒体目录，已被 `.gitignore` 排除，不随公开源码发布。
-- `tools/`：数据校验与资源生成工具。
-
-## 数据与许可
-
-- 动作元数据及说明来自 [hasaneyldrm/exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset)，MIT License。
-- 180×180 图片与 GIF：© Gym visual — https://gymvisual.com/ 。由于授权范围限制，媒体文件不包含在本仓库中；如需本地使用，请自行取得授权并放入上述目录。
 - UI 引用了 [MIUIX](https://github.com/compose-miuix-ui/miuix)。
+- 动作元数据及说明来自 [hasaneyldrm/exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset)。
+- 动作图片与 GIF 归 Gym visual 所有，受授权限制，不包含在本仓库中。
