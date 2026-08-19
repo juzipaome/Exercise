@@ -82,9 +82,11 @@ private fun ExerciseRenameSheet(show:Boolean,currentName:String,datasetName:Stri
     var name by remember(show,currentName){mutableStateOf(currentName)}
     WindowDialog(show=show,title="修改动作中文名",summary="已有训练历史仍保留当时的名称。",onDismissRequest=onDismiss){
         val dismissState=LocalDismissState.current
-        TextField(name,{name=it},label="中文显示名",modifier=Modifier.fillMaxWidth())
-        if(canRestore&&datasetName.isNotBlank()&&currentName!=datasetName)TextButton("恢复数据集原名",onClick=onRestore,modifier=Modifier.fillMaxWidth())
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(20.dp)){TextButton("取消",onClick={dismissState?.invoke()},modifier=Modifier.weight(1f));TextButton("保存",enabled=name.trim().isNotEmpty(),onClick={onSave(name.trim());dismissState?.invoke()},colors=ButtonDefaults.textButtonColorsPrimary(),modifier=Modifier.weight(1f))}
+        Column(verticalArrangement=Arrangement.spacedBy(12.dp)){
+            TextField(name,{name=it},label="中文显示名",modifier=Modifier.fillMaxWidth())
+            if(canRestore&&datasetName.isNotBlank()&&currentName!=datasetName)TextButton("恢复数据集原名",onClick=onRestore,modifier=Modifier.fillMaxWidth())
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(20.dp)){TextButton("取消",onClick={dismissState?.invoke()},modifier=Modifier.weight(1f));TextButton("保存",enabled=name.trim().isNotEmpty(),onClick={onSave(name.trim());dismissState?.invoke()},colors=ButtonDefaults.textButtonColorsPrimary(),modifier=Modifier.weight(1f))}
+        }
     }
 }
 

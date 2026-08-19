@@ -51,7 +51,7 @@ interface WorkoutRepository {
     suspend fun addExercise(sessionId: Long, exerciseId: String, restSeconds: Int)
     suspend fun finish(id: Long): Boolean
     suspend fun saveSessionPlan(id: Long, overwrite: Boolean): Long
-    suspend fun addPastWorkout(planId: Long, exerciseIds: List<String>, date: LocalDate, startMinute: Int, endMinute: Int): Long
+    suspend fun addPastWorkout(planId: Long, exerciseIds: List<String>, date: LocalDate, startMinute: Int, endMinute: Int, cardioDistancesKm: Map<String, Double>, cardioDurationsSeconds: Map<String, Int>): Long
     suspend fun discard(id: Long)
     suspend fun deleteHistory(id: Long)
 }
@@ -59,6 +59,36 @@ interface WorkoutRepository {
 fun trainingVolume(rows: List<SessionSetRow>): Double = rows.filter { it.completed }.sumOf { it.weightKg * it.reps }
 fun initialRecordCount(exercise: ExerciseEntity, strengthSets: Int): Int = if (exercise.isCardio) 1 else strengthSets
 fun initialReps(exercise: ExerciseEntity, strengthReps: Int): Int = if (exercise.isCardio) 0 else strengthReps
+fun normalizedCardioDistance(value: Double): Double = value.takeIf { it.isFinite() && it >= 0.0 } ?: 0.0
+data class PastWorkoutTimeRange(val startedAt:Long,val endedAt:Long) {
+    val durationSeconds:Int get()=((endedAt-startedAt)/1000).coerceAtLeast(0).toInt()
+}
+fun pastWorkoutTimeRange(date:LocalDate,startMinute:Int,endMinute:Int,zoneId:ZoneId=ZoneId.systemDefault()):PastWorkoutTimeRange {
+    val startedAt=date.atStartOfDay().plusMinutes(startMinute.toLong()).atZone(zoneId).toInstant().toEpochMilli()
+    val endedAt=date.atStartOfDay().plusMinutes(endMinute.toLong()).atZone(zoneId).toInstant().toEpochMilli()
+    return PastWorkoutTimeRange(startedAt,endedAt)
+}
+fun pastWorkoutSet(
+    exercise: ExerciseEntity,
+    sessionExerciseId: Long,
+    position: Int,
+    defaultWeightKg: Double,
+    defaultReps: Int,
+    startedAt: Long,
+    endedAt: Long,
+    distanceKm: Double,
+    cardioDurationSeconds: Int? = null,
+) = WorkoutSetEntity(
+    sessionExerciseId = sessionExerciseId,
+    position = position,
+    weightKg = if (exercise.isCardio) 0.0 else defaultWeightKg,
+    reps = initialReps(exercise, defaultReps),
+    completed = true,
+    startedAt = startedAt.takeIf { exercise.isCardio },
+    completedAt = endedAt.takeIf { exercise.isCardio },
+    durationSeconds = if (exercise.isCardio) (cardioDurationSeconds ?: ((endedAt - startedAt) / 1000).coerceAtLeast(0).toInt()).coerceAtLeast(0) else 0,
+    distanceKm = if (exercise.isCardio) normalizedCardioDistance(distanceKm) else 0.0,
+)
 fun hasPlanStructureChanges(
     planItems: List<PlanExerciseEntity>,
     sessionExercises: List<SessionExerciseEntity>,
@@ -157,10 +187,10 @@ class LianJiRepository(private val db: LianJiDatabase) : ExerciseRepository, Pla
         db.sessionDao().getSet(id)?.let { record ->
             val started = record.startedAt ?: now
             val pausedMillis=record.pausedDurationMillis+(record.pausedAt?.let{(now-it).coerceAtLeast(0)}?:0)
-            db.sessionDao().updateSet(record.copy(weightKg=0.0,reps=0,completed=true,startedAt=started,completedAt=now,durationSeconds=activeDurationSeconds(started,now,null,pausedMillis).toInt(),pausedAt=null,pausedDurationMillis=pausedMillis,distanceKm=distanceKm.coerceAtLeast(0.0)))
+            db.sessionDao().updateSet(record.copy(weightKg=0.0,reps=0,completed=true,startedAt=started,completedAt=now,durationSeconds=activeDurationSeconds(started,now,null,pausedMillis).toInt(),pausedAt=null,pausedDurationMillis=pausedMillis,distanceKm=normalizedCardioDistance(distanceKm)))
         }
     } }
-    override suspend fun updateCardioValues(id: Long, durationSeconds: Int, distanceKm: Double) { db.sessionDao().updateCardioValues(id,durationSeconds.coerceAtLeast(0),distanceKm.coerceAtLeast(0.0)) }
+    override suspend fun updateCardioValues(id: Long, durationSeconds: Int, distanceKm: Double) { db.sessionDao().updateCardioValues(id,durationSeconds.coerceAtLeast(0),normalizedCardioDistance(distanceKm)) }
     override suspend fun setSessionRest(sessionId: Long, seconds: Int) { db.sessionDao().updateSessionRest(sessionId,seconds) }
     override suspend fun addSet(sessionExerciseId: Long, position: Int, weight: Double, reps: Int) { db.sessionDao().insertSet(WorkoutSetEntity(sessionExerciseId=sessionExerciseId,position=position,weightKg=weight,reps=reps)) }
     override suspend fun addExercise(sessionId: Long, exerciseId: String, restSeconds: Int) { db.withTransaction {
@@ -194,20 +224,29 @@ class LianJiRepository(private val db: LianJiDatabase) : ExerciseRepository, Pla
         }
         save(plan, items)
     }
-    override suspend fun addPastWorkout(planId: Long, exerciseIds: List<String>, date: LocalDate, startMinute: Int, endMinute: Int): Long = db.withTransaction {
+    override suspend fun addPastWorkout(planId: Long, exerciseIds: List<String>, date: LocalDate, startMinute: Int, endMinute: Int, cardioDistancesKm: Map<String, Double>, cardioDurationsSeconds: Map<String, Int>): Long = db.withTransaction {
         val plan = db.planDao().getPlan(planId) ?: error("计划不存在")
         require(exerciseIds.isNotEmpty()) { "至少选择一个动作" }
         require(startMinute in 0..1439 && endMinute in 1..1440 && endMinute > startMinute) { "结束时间必须晚于开始时间" }
-        val startedAt = date.atStartOfDay().plusMinutes(startMinute.toLong()).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val endedAt = date.atStartOfDay().plusMinutes(endMinute.toLong()).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val sessionId = db.sessionDao().insertSession(WorkoutSessionEntity(sourcePlanId=planId,planNameSnapshot=plan.name,startedAt=startedAt,endedAt=endedAt,localDate=date.toString(),status="COMPLETED"))
+        val timeRange=pastWorkoutTimeRange(date,startMinute,endMinute)
+        val startedAt=timeRange.startedAt
+        val endedAt=timeRange.endedAt
+        val totalDurationSeconds=timeRange.durationSeconds
         val selected = exerciseIds.toSet()
-        db.planDao().getItems(planId).filter { it.exerciseId in selected }.forEachIndexed { position, item ->
-            val exercise = db.exerciseDao().get(item.exerciseId) ?: return@forEachIndexed
+        val selectedItems = db.planDao().getItems(planId).filter { it.exerciseId in selected }.mapNotNull { item ->
+            db.exerciseDao().get(item.exerciseId)?.let { exercise -> item to exercise }
+        }
+        val cardioIds = selectedItems.filter { (_, exercise) -> exercise.isCardio }.map { (_, exercise) -> exercise.id }
+        require(cardioIds.all { id -> cardioDistancesKm[id]?.let { it.isFinite() && it >= 0.0 } != false }) { "有氧距离必须是有限的非负数" }
+        if (cardioIds.size > 1) require(cardioIds.all(cardioDurationsSeconds::containsKey)) { "多个有氧动作需要分别填写时长" }
+        require(cardioIds.map { id -> cardioDurationsSeconds[id] ?: totalDurationSeconds }.all { it in 1..totalDurationSeconds }) { "有氧动作时长必须大于 0 且不超过训练总时长" }
+        require(cardioIds.sumOf { id -> cardioDurationsSeconds[id] ?: totalDurationSeconds } <= totalDurationSeconds) { "有氧动作时长合计不能超过训练总时长" }
+        val sessionId = db.sessionDao().insertSession(WorkoutSessionEntity(sourcePlanId=planId,planNameSnapshot=plan.name,startedAt=startedAt,endedAt=endedAt,localDate=date.toString(),status="COMPLETED"))
+        selectedItems.forEachIndexed { position, (item, exercise) ->
             val exerciseId = db.sessionDao().insertSessionExercise(SessionExerciseEntity(sessionId=sessionId,exerciseId=exercise.id,exerciseNameSnapshot=exercise.nameZh,position=position,restSeconds=item.restSeconds,trackingMode=exercise.trackingMode))
             val recordCount = initialRecordCount(exercise,item.defaultSets)
             db.sessionDao().insertSets(List(recordCount) { index ->
-                WorkoutSetEntity(sessionExerciseId=exerciseId,position=index,weightKg=if(exercise.isCardio)0.0 else item.defaultWeightKg,reps=initialReps(exercise,item.defaultReps),completed=true)
+                pastWorkoutSet(exercise,exerciseId,index,item.defaultWeightKg,item.defaultReps,startedAt,endedAt,cardioDistancesKm[exercise.id] ?: 0.0,cardioDurationsSeconds[exercise.id])
             })
         }
         sessionId

@@ -2,6 +2,8 @@ package com.juzi.lianji.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.time.LocalDate
+import java.time.ZoneId
 
 class DomainTest {
     @Test fun volume_counts_only_completed_sets() {
@@ -29,6 +31,52 @@ class DomainTest {
         )
         assertEquals(1, initialRecordCount(cardio, 3))
         assertEquals(0, initialReps(cardio, 10))
+    }
+
+    @Test fun past_cardio_record_keeps_session_duration_and_distance() {
+        val cardio = ExerciseEntity(
+            id="run",nameEn="Run",nameZh="跑步",bodyPart="cardio",equipment="body weight",
+            target="",muscleGroup="",secondaryMuscles="",instructionsZh="",instructionsEn="",
+            imagePath=null,gifPath=null,attribution="test",trackingMode=TrackingMode.CARDIO,
+        )
+        val record = pastWorkoutSet(cardio,7,0,20.0,10,1_000,1_801_000,5.25)
+
+        assertEquals(1800, record.durationSeconds)
+        assertEquals(5.25, record.distanceKm, 0.001)
+        assertEquals(0.0, record.weightKg, 0.001)
+        assertEquals(0, record.reps)
+    }
+
+    @Test fun past_cardio_record_accepts_an_individual_duration() {
+        val cardio = ExerciseEntity(
+            id="run",nameEn="Run",nameZh="跑步",bodyPart="cardio",equipment="body weight",
+            target="",muscleGroup="",secondaryMuscles="",instructionsZh="",instructionsEn="",
+            imagePath=null,gifPath=null,attribution="test",trackingMode=TrackingMode.CARDIO,
+        )
+        val record = pastWorkoutSet(cardio,7,0,20.0,10,1_000,1_801_000,5.25,420)
+
+        assertEquals(420, record.durationSeconds)
+    }
+
+    @Test fun non_finite_cardio_distance_is_not_persisted() {
+        val cardio = ExerciseEntity(
+            id="run",nameEn="Run",nameZh="跑步",bodyPart="cardio",equipment="body weight",
+            target="",muscleGroup="",secondaryMuscles="",instructionsZh="",instructionsEn="",
+            imagePath=null,gifPath=null,attribution="test",trackingMode=TrackingMode.CARDIO,
+        )
+
+        assertEquals(0.0, pastWorkoutSet(cardio,7,0,20.0,10,1_000,1_801_000,Double.POSITIVE_INFINITY).distanceKm, 0.001)
+    }
+
+    @Test fun negative_cardio_distance_is_not_persisted() {
+        assertEquals(0.0, normalizedCardioDistance(-1.0), 0.001)
+    }
+
+    @Test fun past_workout_duration_uses_the_same_zoned_instants_as_the_session() {
+        val berlin=ZoneId.of("Europe/Berlin")
+
+        assertEquals(3600,pastWorkoutTimeRange(LocalDate.of(2026,3,29),90,210,berlin).durationSeconds)
+        assertEquals(10800,pastWorkoutTimeRange(LocalDate.of(2026,10,25),90,210,berlin).durationSeconds)
     }
 
     @Test fun session_exercise_name_remains_a_snapshot_after_library_rename() {
