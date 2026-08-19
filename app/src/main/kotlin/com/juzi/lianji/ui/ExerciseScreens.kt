@@ -4,8 +4,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -52,19 +54,24 @@ fun ExerciseLibraryScreen(state:MainUiState,padding:PaddingValues,onDetail:(Stri
 fun ExerciseDetailScreen(vm:MainViewModel,id:String,onBack:()->Unit){
     val ex by vm.repository.exercise(id).collectAsStateWithLifecycle(null);val state by vm.state.collectAsStateWithLifecycle();var showRename by remember{mutableStateOf(false)}
     MiuixPageScaffold(title="动作详情",navigationIcon={BackButton(onBack)}){pad->
-        LazyColumn(contentPadding=PaddingValues(top=pad.calculateTopPadding()+12.dp,bottom=24.dp)){ex?.let{e->item{
-            Card(Modifier.cardPadding()){Column{
+        LazyColumn(contentPadding=PaddingValues(top=pad.calculateTopPadding()+12.dp,bottom=24.dp)){ex?.let{e->
+            item{Card(Modifier.cardPadding()){Column{
                 e.gifPath?.let{AsyncImage("file:///android_asset/$it",null,Modifier.fillMaxWidth().aspectRatio(1.8f),contentScale=ContentScale.Fit)}
                 Column(Modifier.padding(18.dp)){
-                    Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(e.nameZh,style=MiuixTheme.textStyles.title1);Text(e.nameEn,color=MiuixTheme.colorScheme.onSurfaceSecondary)};IconButton(onClick={showRename=true}){Icon(MiuixIcons.Edit,"修改中文名")}}
+                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(e.nameZh,style=MiuixTheme.textStyles.title1);Text(e.nameEn,color=MiuixTheme.colorScheme.onSurfaceSecondary)};IconButton(onClick={showRename=true}){Icon(MiuixIcons.Edit,"修改中文名")}}
                     if(!e.isCustom&&e.datasetNameZh.isNotBlank()&&e.nameZh!=e.datasetNameZh)Text("数据集原名：${e.datasetNameZh}",color=MiuixTheme.colorScheme.onSurfaceSecondary)
-                    Spacer(Modifier.height(10.dp));Text("${bodyPartLabel(e.bodyPart)} · ${equipmentLabel(e.equipment)} · ${e.target}");Text(personalBestLabel(state.personalBests[e.id]),color=MiuixTheme.colorScheme.primary)
-                    Spacer(Modifier.height(18.dp));Text("动作说明",style=MiuixTheme.textStyles.title3);Text(e.instructionsZh.ifBlank{e.instructionsEn})
-                    Spacer(Modifier.height(18.dp));Text(e.attribution,color=MiuixTheme.colorScheme.onSurfaceSecondary)
+                    Spacer(Modifier.height(10.dp));Text("${bodyPartLabel(e.bodyPart)} · ${equipmentLabel(e.equipment)} · ${e.target}")
                 }
-            }}
+            }}}
+            item{Card(Modifier.cardPadding()){Row(Modifier.fillMaxWidth().padding(18.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)){
+                Surface(modifier=Modifier.size(52.dp),shape=RoundedCornerShape(16.dp),color=MiuixTheme.colorScheme.primary.copy(alpha=0.12f),shadowElevation=0.dp){Box(contentAlignment=Alignment.Center){Text("🏆",style=MiuixTheme.textStyles.title1)}}
+                Column(Modifier.weight(1f)){Text("个人最佳",style=MiuixTheme.textStyles.title2);Text(personalBestLabel(state.personalBests[e.id]).removePrefix("PB · "),color=MiuixTheme.colorScheme.primary)}
+            }}}
+            item{Card(Modifier.cardPadding()){Column(Modifier.padding(18.dp)){
+                Text("动作说明",style=MiuixTheme.textStyles.title3);Text(e.instructionsZh.ifBlank{e.instructionsEn})
+                Spacer(Modifier.height(18.dp));Text(e.attribution,color=MiuixTheme.colorScheme.onSurfaceSecondary)
+            }}}
         }}
-    }
     }
     ex?.let{e->ExerciseRenameSheet(showRename,e.nameZh,e.datasetNameZh,!e.isCustom,{showRename=false},{name->vm.updateExerciseName(e.id,name);showRename=false},{vm.restoreExerciseName(e.id);showRename=false})}
 }
@@ -99,4 +106,3 @@ fun CustomExerciseScreen(vm:MainViewModel,onBack:()->Unit){
         }
     }
 }
-
