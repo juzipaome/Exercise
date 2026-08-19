@@ -207,13 +207,15 @@ fun DayDetailScreen(vm:MainViewModel,date:String,onBack:()->Unit) {
             val selectedCardioIds=selectedExerciseIds.filter{id->state.exercises.firstOrNull{it.id==id}?.trackingMode==TrackingMode.CARDIO}.toSet()
             val totalDurationSeconds=if(validTime)(endMinute-startMinute)*60 else 0
             val validDistances=selectedCardioIds.all{id->cardioDistances[id].orEmpty().let{it.isBlank()||(it.toDoubleOrNull()?.let{value->value.isFinite()&&value>=0}==true)}}
-            val enteredCardioDurationSeconds=selectedCardioIds.mapNotNull{id->cardioDurations[id]?.toDoubleOrNull()?.takeIf{it.isFinite()&&it>0}?.times(60)?.roundToInt()}
-            val allCardioDurationsPresent=selectedCardioIds.size<=1||enteredCardioDurationSeconds.size==selectedCardioIds.size
-            val validDurations=allCardioDurationsPresent&&enteredCardioDurationSeconds.all{it in 1..totalDurationSeconds}&&enteredCardioDurationSeconds.sum()<=totalDurationSeconds
+            val parsedCardioDurations=selectedCardioIds.associateWith{id->parsePastCardioDurationSeconds(cardioDurations[id].orEmpty(),totalDurationSeconds)}
+            val singleBlankUsesTotal=selectedCardioIds.size==1&&cardioDurations[selectedCardioIds.single()].orEmpty().isBlank()
+            val allCardioDurationsValid=selectedCardioIds.isEmpty()||singleBlankUsesTotal||parsedCardioDurations.values.all{it!=null}
+            val effectiveCardioDurations=selectedCardioIds.associateWith{id->parsedCardioDurations[id]?:totalDurationSeconds}
+            val validDurations=allCardioDurationsValid&&effectiveCardioDurations.values.sum()<=totalDurationSeconds
             Text(if(validTime)"训练总时长：${formatLongDuration((endMinute-startMinute)*60L)}" else "请输入同一天内有效的开始与结束时间",color=if(validTime)MiuixTheme.colorScheme.onSurfaceSecondary else StatusColors.Warning)
             if(!validDistances)Text("距离应为不小于 0 的数字",color=StatusColors.Warning)
             if(!validDurations)Text(if(selectedCardioIds.size>1)"请分别填写有氧时长，合计不能超过训练总时长" else "有氧时长应大于 0 且不超过训练总时长",color=StatusColors.Warning)
-            Button(enabled=selectedExerciseIds.isNotEmpty()&&validTime&&validDistances&&validDurations,onClick={vm.addPastWorkout(selectedPlanId!!,planExerciseIds.filter{it in selectedExerciseIds},LocalDate.parse(date),startMinute!!,endMinute!!,selectedCardioIds.associateWith{id->cardioDistances[id]?.toDoubleOrNull()?:0.0},selectedCardioIds.associateWith{id->(cardioDurations[id]?.toDoubleOrNull()?.times(60)?.roundToInt()?:totalDurationSeconds)});showAddPast=false;selectedPlanId=null},colors=ButtonDefaults.buttonColorsPrimary(),modifier=Modifier.fillMaxWidth()){Text("补录 ${selectedExerciseIds.size} 个动作")}
+            Button(enabled=selectedExerciseIds.isNotEmpty()&&validTime&&validDistances&&validDurations,onClick={vm.addPastWorkout(selectedPlanId!!,planExerciseIds.filter{it in selectedExerciseIds},LocalDate.parse(date),startMinute!!,endMinute!!,selectedCardioIds.associateWith{id->cardioDistances[id]?.toDoubleOrNull()?:0.0},effectiveCardioDurations);showAddPast=false;selectedPlanId=null},colors=ButtonDefaults.buttonColorsPrimary(),modifier=Modifier.fillMaxWidth()){Text("补录 ${selectedExerciseIds.size} 个动作")}
         }
     }
 }
@@ -307,6 +309,11 @@ fun MonthAnalyticsScreen(vm:MainViewModel,month:YearMonth,onBack:()->Unit) {
 private fun sessionMinutes(session:WorkoutSessionEntity)=(((session.endedAt?:session.startedAt)-session.startedAt).coerceAtLeast(0)/60_000).toInt()
 private fun sessionHour(session:WorkoutSessionEntity)=Instant.ofEpochMilli(session.startedAt).atZone(ZoneId.systemDefault()).hour
 private fun formatVolume(value:Double)=if(value>=1000)"%.1f 吨".format(value/1000) else "%.0f kg".format(value)
+fun parsePastCardioDurationSeconds(value:String,totalDurationSeconds:Int):Int? {
+    val minutes=value.toDoubleOrNull()?:return null
+    if(!minutes.isFinite()||minutes<=0||minutes>totalDurationSeconds/60.0)return null
+    return (minutes*60).roundToInt().takeIf{it in 1..totalDurationSeconds}
+}
 
 @Composable private fun HistoryExercise(records:List<SessionSetRow>,onStrengthEdit:(Long,Double,Int)->Unit,onCardioEdit:(Long,Int,Double)->Unit){val cardio=records.first().trackingMode==TrackingMode.CARDIO;Card{Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){Text(records.first().exerciseName,style=MiuixTheme.textStyles.title3);records.forEach{record->if(cardio)EditableCompletedCardioRecord(record){duration,distance->onCardioEdit(record.setId,duration,distance)}else EditableCompletedStrengthRecord(record){weight,reps->onStrengthEdit(record.setId,weight,reps)}}}}}
 private fun formatLongDuration(seconds:Long)=if(seconds>=3600)"${seconds/3600}小时${seconds/60%60}分" else "${seconds/60}分钟"
