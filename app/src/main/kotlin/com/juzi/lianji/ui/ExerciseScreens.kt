@@ -2,6 +2,7 @@ package com.juzi.lianji.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.juzi.lianji.*
@@ -29,15 +31,14 @@ import top.yukonga.miuix.kmp.icon.extended.FavoritesFill
 import top.yukonga.miuix.kmp.icon.extended.Edit
 
 @Composable
-fun ExerciseLibraryScreen(state:MainUiState,padding:PaddingValues,onDetail:(String)->Unit,onNew:()->Unit,onFavorite:(String)->Unit) {
+fun ExerciseLibraryScreen(state:MainUiState,padding:PaddingValues,listState:LazyListState,scrollBehavior:ScrollBehavior,onDetail:(String)->Unit,onFavorite:(String)->Unit) {
     var query by rememberSaveable{mutableStateOf("")};var body by rememberSaveable{mutableStateOf("")};var equipment by rememberSaveable{mutableStateOf("")}
     val bodies=remember(state.exercises){state.exercises.map{it.bodyPart}.distinct().sortedBy(::bodyPartLabel)}
     val equipments=remember(state.exercises){state.exercises.map{it.equipment}.distinct().sortedBy(::equipmentLabel)}
     val filtered=remember(state.exercises,query,body,equipment){
         state.exercises.filter{(query.isBlank()||it.nameZh.contains(query,true)||it.nameEn.contains(query,true))&&(body.isBlank()||it.bodyPart==body)&&(equipment.isBlank()||it.equipment==equipment)}
     }
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(top=padding.calculateTopPadding()+12.dp,bottom=padding.calculateBottomPadding()+24.dp)) {
-        item { Row(Modifier.fillMaxWidth().padding(start=18.dp,end=12.dp,top=10.dp,bottom=10.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("动作库",style=MiuixTheme.textStyles.title1);Text("${state.exercises.size} 个离线动作，随时可查",color=MiuixTheme.colorScheme.onSurfaceSecondary)};IconButton(onClick=onNew){Icon(MiuixIcons.Add,"自定义动作")}} }
+    LazyColumn(Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),state=listState,contentPadding=PaddingValues(top=padding.calculateTopPadding()+12.dp,bottom=padding.calculateBottomPadding()+24.dp)) {
         item { TextField(query,{query=it},label="搜索动作",useLabelAsPlaceholder=true,modifier=Modifier.cardPadding().fillMaxWidth()) }
         item { Text("训练部位",style=MiuixTheme.textStyles.title3,modifier=Modifier.padding(horizontal=12.dp,vertical=4.dp)) }
         item { LazyRow(contentPadding=PaddingValues(horizontal=12.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){item{FilterButton("全部",body.isBlank()){body=""}};items(bodies){value->FilterButton(bodyPartLabel(value),body==value){body=value}}};Spacer(Modifier.height(8.dp)) }

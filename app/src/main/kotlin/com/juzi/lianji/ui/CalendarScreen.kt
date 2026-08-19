@@ -3,6 +3,7 @@ package com.juzi.lianji.ui
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
@@ -12,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.juzi.lianji.MainUiState
@@ -37,11 +39,10 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-@Composable fun CalendarScreen(state:MainUiState,padding:PaddingValues,onDay:(String)->Unit,onMonth:(YearMonth)->Unit){
+@Composable fun CalendarScreen(state:MainUiState,padding:PaddingValues,listState:LazyListState,scrollBehavior:ScrollBehavior,onDay:(String)->Unit,onMonth:(YearMonth)->Unit){
     var monthValue by rememberSaveable{mutableStateOf(YearMonth.now().toString())};val month=YearMonth.parse(monthValue);val offset=month.atDay(1).dayOfWeek.value-1;val summaries=state.days.groupBy{it.localDate};val prefix=month.toString()
     val completed=state.sessions.filter{it.localDate.startsWith(prefix)&&it.status=="COMPLETED"};val trainingDays=completed.map{it.localDate}.distinct().size;val seconds=completed.sumOf{((it.endedAt?:it.startedAt)-it.startedAt).coerceAtLeast(0)}/1000
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(top=padding.calculateTopPadding()+12.dp,bottom=padding.calculateBottomPadding()+24.dp)){
-        item{PageHeading("日历","按月回看你的训练轨迹")}
+    LazyColumn(Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),state=listState,contentPadding=PaddingValues(top=padding.calculateTopPadding()+12.dp,bottom=padding.calculateBottomPadding()+24.dp)){
         item{Card(modifier=Modifier.fillMaxWidth().cardPadding(),pressFeedbackType=PressFeedbackType.Sink,onClick={onMonth(month)}){Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("本月概览",style=MiuixTheme.textStyles.title2);Text("${month.format(DateTimeFormatter.ofPattern("yyyy年 M月"))} · 点击查看详细分析",color=MiuixTheme.colorScheme.onSurfaceSecondary)};Icon(MiuixIcons.ChevronForward,"查看月度分析")};Row(Modifier.fillMaxWidth()){MonthStat(trainingDays.toString(),"训练日",Modifier.weight(1f));MonthStat(completed.size.toString(),"训练次数",Modifier.weight(1f));MonthStat(formatLongDuration(seconds),"总时长",Modifier.weight(1f))}}}}
         item{Card(Modifier.cardPadding()){Column(Modifier.padding(horizontal=10.dp,vertical=12.dp)){
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){PreviousButton{monthValue=month.minusMonths(1).toString()};Text(month.format(DateTimeFormatter.ofPattern("yyyy年 M月")),style=MiuixTheme.textStyles.title2);NextButton{monthValue=month.plusMonths(1).toString()}}

@@ -5,10 +5,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import com.juzi.lianji.MainUiState
 import com.juzi.lianji.MainViewModel
 import kotlinx.coroutines.launch
@@ -21,9 +23,8 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.*
 
 @Composable
-fun SettingsScreen(state:MainUiState,padding:PaddingValues,vm:MainViewModel,onAbout:()->Unit){val scope=rememberCoroutineScope();var message by rememberSaveable{mutableStateOf("")};val themeModes=listOf("SYSTEM","LIGHT","DARK");val themeOptions=listOf("跟随系统","浅色主题","深色主题");val restOptions=listOf(30,60,90,120,180);val export=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->uri?.let{scope.launch{runCatching{vm.backupManager.exportTo(it)}.onSuccess{message="备份已导出"}.onFailure{message="导出失败：${it.message}"}}}};val import=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->uri?.let{scope.launch{runCatching{vm.backupManager.importFrom(it)}.onSuccess{message="恢复完成"}.onFailure{message="恢复失败，原数据未修改：${it.message}"}}}}
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(top=padding.calculateTopPadding()+12.dp,bottom=padding.calculateBottomPadding()+24.dp)){
-        item{PageHeading("设置","让练迹更符合你的使用习惯")}
+fun SettingsScreen(state:MainUiState,padding:PaddingValues,listState:LazyListState,scrollBehavior:ScrollBehavior,vm:MainViewModel,onAbout:()->Unit){val scope=rememberCoroutineScope();var message by rememberSaveable{mutableStateOf("")};val themeModes=listOf("SYSTEM","LIGHT","DARK");val themeOptions=listOf("跟随系统","浅色主题","深色主题");val restOptions=listOf(30,60,90,120,180);val export=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->uri?.let{scope.launch{runCatching{vm.backupManager.exportTo(it)}.onSuccess{message="备份已导出"}.onFailure{message="导出失败：${it.message}"}}}};val import=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->uri?.let{scope.launch{runCatching{vm.backupManager.importFrom(it)}.onSuccess{message="恢复完成"}.onFailure{message="恢复失败，原数据未修改：${it.message}"}}}}
+    LazyColumn(Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),state=listState,contentPadding=PaddingValues(top=padding.calculateTopPadding()+12.dp,bottom=padding.calculateBottomPadding()+24.dp)){
         item{SmallTitle("外观")}
         item{Card(Modifier.cardPadding()){Column{OverlayDropdownPreference(items=themeOptions,selectedIndex=themeModes.indexOf(state.settings.themeMode).coerceAtLeast(0),title="主题模式",startAction={Icon(MiuixIcons.Theme,"主题模式")},onSelectedIndexChange={scope.launch{vm.settingsStore.setTheme(themeModes[it])}});HorizontalDivider(Modifier.padding(horizontal=16.dp));SwitchPreference(checked=state.settings.dynamicColor,onCheckedChange={scope.launch{vm.settingsStore.setDynamic(it)}},title="Monet 动态色",summary="跟随系统壁纸生成应用强调色")}}}
         item{SmallTitle("训练提醒")}

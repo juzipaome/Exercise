@@ -5,9 +5,12 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
@@ -70,6 +73,36 @@ fun MiuixPageScaffold(
                 .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier),
         ) {
             content(padding)
+        }
+    }
+}
+
+/** Observe the MIUIX top bar without stealing clicks from navigation/actions. */
+fun Modifier.topAppBarDoubleTap(onDoubleTap: () -> Unit): Modifier = pointerInput(onDoubleTap) {
+    awaitPointerEventScope {
+        while (true) {
+            val firstDown=awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Final)
+            var firstUpAt:Long?=null
+            while (firstUpAt==null) {
+                val event=awaitPointerEvent(PointerEventPass.Final)
+                val change=event.changes.firstOrNull { it.id==firstDown.id } ?: break
+                if (!change.pressed && change.previousPressed) firstUpAt=change.uptimeMillis
+            }
+            val firstUp=firstUpAt ?: continue
+            var secondDownAt:Long?=null
+            var secondPointerId=firstDown.id
+            while (true) {
+                val event=awaitPointerEvent(PointerEventPass.Final)
+                val change=event.changes.firstOrNull() ?: continue
+                if (change.pressed && !change.previousPressed) {
+                    if (change.uptimeMillis-firstUp>viewConfiguration.doubleTapTimeoutMillis) break
+                    secondDownAt=change.uptimeMillis
+                    secondPointerId=change.id
+                } else if (secondDownAt!=null && change.id==secondPointerId && !change.pressed && change.previousPressed) {
+                    onDoubleTap()
+                    break
+                }
+            }
         }
     }
 }

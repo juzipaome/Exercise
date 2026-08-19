@@ -9,6 +9,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -121,6 +122,14 @@ private fun MainTabs(vm:MainViewModel,selectedPage:Int,onSelectedPage:(Int)->Uni
     val state by vm.state.collectAsStateWithLifecycle()
     val pager=rememberPagerState(initialPage=selectedPage,pageCount={4})
     val mainPagerState=rememberMainPagerState(pager)
+    val coroutineScope=rememberCoroutineScope()
+    val listStates=List(4) { rememberLazyListState() }
+    val scrollBehaviors=listOf(
+        MiuixScrollBehavior(rememberTopAppBarState()),
+        MiuixScrollBehavior(rememberTopAppBarState()),
+        MiuixScrollBehavior(rememberTopAppBarState()),
+        MiuixScrollBehavior(rememberTopAppBarState()),
+    )
     LaunchedEffect(pager.currentPage){mainPagerState.syncPage();onSelectedPage(pager.currentPage)}
     // Each page receives only the fields it renders. Loading the exercise library and
     // history after startup must not invalidate and recompose the already visible home.
@@ -129,6 +138,7 @@ private fun MainTabs(vm:MainViewModel,selectedPage:Int,onSelectedPage:(Int)->Uni
     val exerciseState=remember(state.exercises){MainUiState(isReady=true,exercises=state.exercises)}
     val settingsState=remember(state.settings){MainUiState(isReady=true,settings=state.settings)}
     val labels=listOf("运动","日历","动作库","设置")
+    val subtitles=listOf("今天也为自己积累一点进步","按月回看你的训练轨迹","离线动作库，随时可查","让练迹更符合你的使用习惯")
     val icons=listOf(MiuixIcons.Home,MiuixIcons.Months,MiuixIcons.All,MiuixIcons.Settings)
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide=maxWidth>=600.dp
@@ -143,6 +153,46 @@ private fun MainTabs(vm:MainViewModel,selectedPage:Int,onSelectedPage:(Int)->Uni
             }
             Scaffold(
                 modifier=Modifier.weight(1f),
+                topBar={
+                    val activePage=mainPagerState.selectedPage
+                    val activeListState=listStates[activePage]
+                    val activeScrollBehavior=scrollBehaviors[activePage]
+                    val scrollToTop={
+                        coroutineScope.launch {
+                            activeListState.animateScrollToItem(0)
+                            activeScrollBehavior.state.heightOffset=0f
+                            activeScrollBehavior.state.contentOffset=0f
+                        }
+                    }
+                    Box(
+                        Modifier
+                            .textureBlur(backdrop=backdrop,shape=RectangleShape,blurRadius=25f,colors=navigationBarBlurColors)
+                            .topAppBarDoubleTap { scrollToTop() },
+                    ) {
+                        val barActions: @Composable RowScope.() -> Unit = {
+                            if (activePage==0) IconButton(onClick={onNavigate(AppScreen.NewPlan)}) { Icon(MiuixIcons.Add,"创建计划") }
+                            if (activePage==2) IconButton(onClick={onNavigate(AppScreen.NewExercise)}) { Icon(MiuixIcons.Add,"自定义动作") }
+                        }
+                        if (wide) {
+                            SmallTopAppBar(
+                                title=labels[activePage],
+                                subtitle=subtitles[activePage],
+                                color=Color.Transparent,
+                                scrollBehavior=activeScrollBehavior,
+                                defaultWindowInsetsPadding=false,
+                                actions=barActions,
+                            )
+                        } else {
+                            TopAppBar(
+                                title=labels[activePage],
+                                subtitle=subtitles[activePage],
+                                color=Color.Transparent,
+                                scrollBehavior=activeScrollBehavior,
+                                actions=barActions,
+                            )
+                        }
+                    }
+                },
                 bottomBar={ if(!wide) Box(
                     Modifier.textureBlur(backdrop=backdrop,shape=RectangleShape,blurRadius=25f,colors=navigationBarBlurColors),
                 ) { NavigationBar(color=Color.Transparent) { labels.forEachIndexed { i,label -> NavigationBarItem(selected=mainPagerState.selectedPage==i,onClick={mainPagerState.animateToPage(i)},icon=icons[i],label=label) } } } },
@@ -150,10 +200,10 @@ private fun MainTabs(vm:MainViewModel,selectedPage:Int,onSelectedPage:(Int)->Uni
                 Box(Modifier.fillMaxSize().layerBackdrop(backdrop)) {
                     HorizontalPager(state=pager,modifier=Modifier.fillMaxSize(),verticalAlignment=androidx.compose.ui.Alignment.Top) { page ->
                         when(page) {
-                            0 -> WorkoutHomeScreen(homeState, padding, onNew={onNavigate(AppScreen.NewPlan)},onEdit={onNavigate(AppScreen.EditPlan(it))}, onStart={vm.start(it){id->onNavigate(AppScreen.Workout(id))}}, onContinue={homeState.active?.let{onNavigate(AppScreen.Workout(it.id))}}, onDuplicate=vm::duplicatePlan,onDelete=vm::deletePlan)
-                            1 -> CalendarScreen(calendarState,padding,onDay={onNavigate(AppScreen.Day(it))},onMonth={onNavigate(AppScreen.MonthAnalytics(it.toString()))})
-                            2 -> ExerciseLibraryScreen(exerciseState,padding,{onNavigate(AppScreen.ExerciseDetail(it))},{onNavigate(AppScreen.NewExercise)},vm::toggleFavorite)
-                            else -> SettingsScreen(settingsState,padding,vm,onAbout={onNavigate(AppScreen.About)})
+                            0 -> WorkoutHomeScreen(homeState,padding,listStates[0],scrollBehaviors[0],onEdit={onNavigate(AppScreen.EditPlan(it))},onStart={vm.start(it){id->onNavigate(AppScreen.Workout(id))}},onContinue={homeState.active?.let{onNavigate(AppScreen.Workout(it.id))}},onDuplicate=vm::duplicatePlan,onDelete=vm::deletePlan)
+                            1 -> CalendarScreen(calendarState,padding,listStates[1],scrollBehaviors[1],onDay={onNavigate(AppScreen.Day(it))},onMonth={onNavigate(AppScreen.MonthAnalytics(it.toString()))})
+                            2 -> ExerciseLibraryScreen(exerciseState,padding,listStates[2],scrollBehaviors[2],{onNavigate(AppScreen.ExerciseDetail(it))},vm::toggleFavorite)
+                            else -> SettingsScreen(settingsState,padding,listStates[3],scrollBehaviors[3],vm,onAbout={onNavigate(AppScreen.About)})
                         }
                     }
                 }

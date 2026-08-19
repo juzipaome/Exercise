@@ -2,6 +2,8 @@ package com.juzi.lianji.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.*
@@ -16,9 +18,8 @@ import top.yukonga.miuix.kmp.icon.extended.*
 import top.yukonga.miuix.kmp.menu.OverlayIconDropdownMenu
 
 @Composable
-fun WorkoutHomeScreen(state:MainUiState,padding:PaddingValues,onNew:()->Unit,onEdit:(Long)->Unit,onStart:(Long)->Unit,onContinue:()->Unit,onDuplicate:(Long)->Unit,onDelete:(Long)->Unit) {
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(top=padding.calculateTopPadding()+12.dp,bottom=padding.calculateBottomPadding()+24.dp)) {
-        item { Row(Modifier.fillMaxWidth().padding(start=18.dp,end=12.dp,top=10.dp,bottom=10.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("运动",style=MiuixTheme.textStyles.title1);Text("今天也为自己积累一点进步",color=MiuixTheme.colorScheme.onSurfaceSecondary)};IconButton(onClick=onNew){Icon(MiuixIcons.Add,"创建计划")}} }
+fun WorkoutHomeScreen(state:MainUiState,padding:PaddingValues,listState:LazyListState,scrollBehavior:ScrollBehavior,onEdit:(Long)->Unit,onStart:(Long)->Unit,onContinue:()->Unit,onDuplicate:(Long)->Unit,onDelete:(Long)->Unit) {
+    LazyColumn(Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),state=listState,contentPadding=PaddingValues(top=padding.calculateTopPadding()+12.dp,bottom=padding.calculateBottomPadding()+24.dp)) {
         state.active?.let { active -> item {
             HeroCard("训练进行中",active.planNameSnapshot,"继续记录",onContinue)
         }}
