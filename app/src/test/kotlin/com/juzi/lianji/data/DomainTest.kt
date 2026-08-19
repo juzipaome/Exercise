@@ -2,6 +2,8 @@ package com.juzi.lianji.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.time.LocalDate
+import java.time.ZoneId
 
 class DomainTest {
     @Test fun volume_counts_only_completed_sets() {
@@ -68,6 +70,13 @@ class DomainTest {
 
     @Test fun negative_cardio_distance_is_not_persisted() {
         assertEquals(0.0, normalizedCardioDistance(-1.0), 0.001)
+    }
+
+    @Test fun past_workout_duration_uses_the_same_zoned_instants_as_the_session() {
+        val berlin=ZoneId.of("Europe/Berlin")
+
+        assertEquals(3600,pastWorkoutTimeRange(LocalDate.of(2026,3,29),90,210,berlin).durationSeconds)
+        assertEquals(10800,pastWorkoutTimeRange(LocalDate.of(2026,10,25),90,210,berlin).durationSeconds)
     }
 
     @Test fun session_exercise_name_remains_a_snapshot_after_library_rename() {

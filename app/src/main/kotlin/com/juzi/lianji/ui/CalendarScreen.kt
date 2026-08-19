@@ -180,7 +180,7 @@ fun DayDetailScreen(vm:MainViewModel,date:String,onBack:()->Unit) {
                 CheckboxPreference(title=exercise.nameZh,summary=bodyPartLabel(exercise.bodyPart),checked=checked,onCheckedChange={toggle()},checkboxLocation=CheckboxLocation.End,modifier=Modifier.fillMaxWidth())
                 if(checked&&exercise.trackingMode==TrackingMode.CARDIO) {
                     val selectedCardioCount=selectedExerciseIds.count{selectedId->state.exercises.firstOrNull{it.id==selectedId}?.trackingMode==TrackingMode.CARDIO}
-                    val defaultDurationMinutes = if(selectedCardioCount==1)parseTimeMinute(startTime)?.let { start -> parseTimeMinute(endTime)?.let { end -> (end - start) / 60.0 } } else null
+                    val defaultDurationMinutes = if(selectedCardioCount==1)parseTimeMinute(startTime)?.let { start -> parseTimeMinute(endTime)?.takeIf{it>start}?.let { end -> pastWorkoutTimeRange(LocalDate.parse(date),start,end).durationSeconds/60.0 } } else null
                     Row(Modifier.fillMaxWidth().padding(horizontal=12.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                         TextField(
                             value=cardioDurations[id] ?: defaultDurationMinutes?.let(::displayDecimal).orEmpty(),
@@ -205,14 +205,14 @@ fun DayDetailScreen(vm:MainViewModel,date:String,onBack:()->Unit) {
             val startMinute=parseTimeMinute(startTime);val endMinute=parseTimeMinute(endTime)
             val validTime=startMinute!=null&&endMinute!=null&&endMinute>startMinute
             val selectedCardioIds=selectedExerciseIds.filter{id->state.exercises.firstOrNull{it.id==id}?.trackingMode==TrackingMode.CARDIO}.toSet()
-            val totalDurationSeconds=if(validTime)(endMinute-startMinute)*60 else 0
+            val totalDurationSeconds=if(validTime)pastWorkoutTimeRange(LocalDate.parse(date),startMinute,endMinute).durationSeconds else 0
             val validDistances=selectedCardioIds.all{id->cardioDistances[id].orEmpty().let{it.isBlank()||(it.toDoubleOrNull()?.let{value->value.isFinite()&&value>=0}==true)}}
             val parsedCardioDurations=selectedCardioIds.associateWith{id->parsePastCardioDurationSeconds(cardioDurations[id].orEmpty(),totalDurationSeconds)}
             val singleBlankUsesTotal=selectedCardioIds.size==1&&cardioDurations[selectedCardioIds.single()].orEmpty().isBlank()
             val allCardioDurationsValid=selectedCardioIds.isEmpty()||singleBlankUsesTotal||parsedCardioDurations.values.all{it!=null}
             val effectiveCardioDurations=selectedCardioIds.associateWith{id->parsedCardioDurations[id]?:totalDurationSeconds}
             val validDurations=allCardioDurationsValid&&effectiveCardioDurations.values.sum()<=totalDurationSeconds
-            Text(if(validTime)"训练总时长：${formatLongDuration((endMinute-startMinute)*60L)}" else "请输入同一天内有效的开始与结束时间",color=if(validTime)MiuixTheme.colorScheme.onSurfaceSecondary else StatusColors.Warning)
+            Text(if(validTime)"训练总时长：${formatLongDuration(totalDurationSeconds.toLong())}" else "请输入同一天内有效的开始与结束时间",color=if(validTime)MiuixTheme.colorScheme.onSurfaceSecondary else StatusColors.Warning)
             if(!validDistances)Text("距离应为不小于 0 的数字",color=StatusColors.Warning)
             if(!validDurations)Text(if(selectedCardioIds.size>1)"请分别填写有氧时长，合计不能超过训练总时长" else "有氧时长应大于 0 且不超过训练总时长",color=StatusColors.Warning)
             Button(enabled=selectedExerciseIds.isNotEmpty()&&validTime&&validDistances&&validDurations,onClick={vm.addPastWorkout(selectedPlanId!!,planExerciseIds.filter{it in selectedExerciseIds},LocalDate.parse(date),startMinute!!,endMinute!!,selectedCardioIds.associateWith{id->cardioDistances[id]?.toDoubleOrNull()?:0.0},effectiveCardioDurations);showAddPast=false;selectedPlanId=null},colors=ButtonDefaults.buttonColorsPrimary(),modifier=Modifier.fillMaxWidth()){Text("补录 ${selectedExerciseIds.size} 个动作")}

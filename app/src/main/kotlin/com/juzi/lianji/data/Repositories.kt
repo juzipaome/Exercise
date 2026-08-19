@@ -60,6 +60,14 @@ fun trainingVolume(rows: List<SessionSetRow>): Double = rows.filter { it.complet
 fun initialRecordCount(exercise: ExerciseEntity, strengthSets: Int): Int = if (exercise.isCardio) 1 else strengthSets
 fun initialReps(exercise: ExerciseEntity, strengthReps: Int): Int = if (exercise.isCardio) 0 else strengthReps
 fun normalizedCardioDistance(value: Double): Double = value.takeIf { it.isFinite() && it >= 0.0 } ?: 0.0
+data class PastWorkoutTimeRange(val startedAt:Long,val endedAt:Long) {
+    val durationSeconds:Int get()=((endedAt-startedAt)/1000).coerceAtLeast(0).toInt()
+}
+fun pastWorkoutTimeRange(date:LocalDate,startMinute:Int,endMinute:Int,zoneId:ZoneId=ZoneId.systemDefault()):PastWorkoutTimeRange {
+    val startedAt=date.atStartOfDay().plusMinutes(startMinute.toLong()).atZone(zoneId).toInstant().toEpochMilli()
+    val endedAt=date.atStartOfDay().plusMinutes(endMinute.toLong()).atZone(zoneId).toInstant().toEpochMilli()
+    return PastWorkoutTimeRange(startedAt,endedAt)
+}
 fun pastWorkoutSet(
     exercise: ExerciseEntity,
     sessionExerciseId: Long,
@@ -220,9 +228,10 @@ class LianJiRepository(private val db: LianJiDatabase) : ExerciseRepository, Pla
         val plan = db.planDao().getPlan(planId) ?: error("计划不存在")
         require(exerciseIds.isNotEmpty()) { "至少选择一个动作" }
         require(startMinute in 0..1439 && endMinute in 1..1440 && endMinute > startMinute) { "结束时间必须晚于开始时间" }
-        val startedAt = date.atStartOfDay().plusMinutes(startMinute.toLong()).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val endedAt = date.atStartOfDay().plusMinutes(endMinute.toLong()).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val totalDurationSeconds = ((endedAt - startedAt) / 1000).toInt()
+        val timeRange=pastWorkoutTimeRange(date,startMinute,endMinute)
+        val startedAt=timeRange.startedAt
+        val endedAt=timeRange.endedAt
+        val totalDurationSeconds=timeRange.durationSeconds
         val selected = exerciseIds.toSet()
         val selectedItems = db.planDao().getItems(planId).filter { it.exerciseId in selected }.mapNotNull { item ->
             db.exerciseDao().get(item.exerciseId)?.let { exercise -> item to exercise }
