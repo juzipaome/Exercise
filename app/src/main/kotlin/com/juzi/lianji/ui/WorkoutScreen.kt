@@ -138,6 +138,16 @@ private fun CardioRecordRow(record:SessionSetRow,now:Long,onBegin:()->Unit,onPau
     else Row(Modifier.fillMaxWidth().padding(vertical=6.dp),verticalAlignment=Alignment.CenterVertically){Text("第 ${set.setPosition+1} 组",style=MiuixTheme.textStyles.title3,modifier=Modifier.width(72.dp));Column(Modifier.weight(1f)){Text("${set.weightKg} kg × ${set.reps} 次");Text(if(set.completed)"已完成 · ${formatDuration(elapsed)}${if(set.restDurationSeconds>0)" · 休息 ${formatDuration(set.restDurationSeconds.toLong())}" else ""}" else "未开始",style=MiuixTheme.textStyles.footnote1,color=if(set.completed)MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceSecondary)};if(set.completed)IconButton(onClick={editing=true}){Icon(MiuixIcons.Edit,"编辑本组")}else{IconButton(onClick=onBegin){Icon(MiuixIcons.Play,"开始本组")};IconButton(onClick=onDelete){Icon(MiuixIcons.Delete,"删除本组")}}};HorizontalDivider()
 }
 
+@Composable
+fun EditableCompletedCardioRecord(record:SessionSetRow,onEdit:(Int,Double)->Unit){
+    CardioRecordRow(record,0L,onBegin={},onPause={},onComplete={},onEdit=onEdit,onDelete={})
+}
+
+@Composable
+fun EditableCompletedStrengthRecord(record:SessionSetRow,onEdit:(Double,Int)->Unit){
+    CompactSetRow(record,0L,onBegin={},onPause={},onComplete={_,_->},onEdit=onEdit,onDelete={})
+}
+
 @Composable private fun WorkoutSheetHost(show:Boolean,kind:WorkoutSheet,currentRest:Int,onDismiss:()->Unit,onContinue:()->Unit,onDiscard:()->Unit,onSelectRest:(Int)->Unit){
     var selectedRest by remember(currentRest,show){mutableIntStateOf(currentRest)}
     if(kind==WorkoutSheet.Exit)MiuixActionDialog(show,"退出本次训练","训练记录正在自动保存。你可以稍后继续，也可以放弃并删除本次记录。","放弃训练","后台继续",onDismiss,onDiscard,onContinue)

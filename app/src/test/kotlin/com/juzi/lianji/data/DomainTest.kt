@@ -31,6 +31,20 @@ class DomainTest {
         assertEquals(0, initialReps(cardio, 10))
     }
 
+    @Test fun past_cardio_record_keeps_session_duration_and_distance() {
+        val cardio = ExerciseEntity(
+            id="run",nameEn="Run",nameZh="跑步",bodyPart="cardio",equipment="body weight",
+            target="",muscleGroup="",secondaryMuscles="",instructionsZh="",instructionsEn="",
+            imagePath=null,gifPath=null,attribution="test",trackingMode=TrackingMode.CARDIO,
+        )
+        val record = pastWorkoutSet(cardio,7,0,20.0,10,1_000,1_801_000,5.25)
+
+        assertEquals(1800, record.durationSeconds)
+        assertEquals(5.25, record.distanceKm, 0.001)
+        assertEquals(0.0, record.weightKg, 0.001)
+        assertEquals(0, record.reps)
+    }
+
     @Test fun session_exercise_name_remains_a_snapshot_after_library_rename() {
         val snapshot = SessionExerciseEntity(sessionId=1,exerciseId="1",exerciseNameSnapshot="原显示名",position=0,restSeconds=90)
         val renamedLibraryExercise = "更好的中文名"

@@ -51,7 +51,7 @@ interface WorkoutRepository {
     suspend fun addExercise(sessionId: Long, exerciseId: String, restSeconds: Int)
     suspend fun finish(id: Long): Boolean
     suspend fun saveSessionPlan(id: Long, overwrite: Boolean): Long
-    suspend fun addPastWorkout(planId: Long, exerciseIds: List<String>, date: LocalDate, startMinute: Int, endMinute: Int): Long
+    suspend fun addPastWorkout(planId: Long, exerciseIds: List<String>, date: LocalDate, startMinute: Int, endMinute: Int, cardioDistancesKm: Map<String, Double>): Long
     suspend fun discard(id: Long)
     suspend fun deleteHistory(id: Long)
 }
@@ -59,6 +59,26 @@ interface WorkoutRepository {
 fun trainingVolume(rows: List<SessionSetRow>): Double = rows.filter { it.completed }.sumOf { it.weightKg * it.reps }
 fun initialRecordCount(exercise: ExerciseEntity, strengthSets: Int): Int = if (exercise.isCardio) 1 else strengthSets
 fun initialReps(exercise: ExerciseEntity, strengthReps: Int): Int = if (exercise.isCardio) 0 else strengthReps
+fun pastWorkoutSet(
+    exercise: ExerciseEntity,
+    sessionExerciseId: Long,
+    position: Int,
+    defaultWeightKg: Double,
+    defaultReps: Int,
+    startedAt: Long,
+    endedAt: Long,
+    distanceKm: Double,
+) = WorkoutSetEntity(
+    sessionExerciseId = sessionExerciseId,
+    position = position,
+    weightKg = if (exercise.isCardio) 0.0 else defaultWeightKg,
+    reps = initialReps(exercise, defaultReps),
+    completed = true,
+    startedAt = startedAt.takeIf { exercise.isCardio },
+    completedAt = endedAt.takeIf { exercise.isCardio },
+    durationSeconds = if (exercise.isCardio) ((endedAt - startedAt) / 1000).coerceAtLeast(0).toInt() else 0,
+    distanceKm = if (exercise.isCardio) distanceKm.coerceAtLeast(0.0) else 0.0,
+)
 fun hasPlanStructureChanges(
     planItems: List<PlanExerciseEntity>,
     sessionExercises: List<SessionExerciseEntity>,
@@ -194,7 +214,7 @@ class LianJiRepository(private val db: LianJiDatabase) : ExerciseRepository, Pla
         }
         save(plan, items)
     }
-    override suspend fun addPastWorkout(planId: Long, exerciseIds: List<String>, date: LocalDate, startMinute: Int, endMinute: Int): Long = db.withTransaction {
+    override suspend fun addPastWorkout(planId: Long, exerciseIds: List<String>, date: LocalDate, startMinute: Int, endMinute: Int, cardioDistancesKm: Map<String, Double>): Long = db.withTransaction {
         val plan = db.planDao().getPlan(planId) ?: error("计划不存在")
         require(exerciseIds.isNotEmpty()) { "至少选择一个动作" }
         require(startMinute in 0..1439 && endMinute in 1..1440 && endMinute > startMinute) { "结束时间必须晚于开始时间" }
@@ -207,7 +227,7 @@ class LianJiRepository(private val db: LianJiDatabase) : ExerciseRepository, Pla
             val exerciseId = db.sessionDao().insertSessionExercise(SessionExerciseEntity(sessionId=sessionId,exerciseId=exercise.id,exerciseNameSnapshot=exercise.nameZh,position=position,restSeconds=item.restSeconds,trackingMode=exercise.trackingMode))
             val recordCount = initialRecordCount(exercise,item.defaultSets)
             db.sessionDao().insertSets(List(recordCount) { index ->
-                WorkoutSetEntity(sessionExerciseId=exerciseId,position=index,weightKg=if(exercise.isCardio)0.0 else item.defaultWeightKg,reps=initialReps(exercise,item.defaultReps),completed=true)
+                pastWorkoutSet(exercise,exerciseId,index,item.defaultWeightKg,item.defaultReps,startedAt,endedAt,cardioDistancesKm[exercise.id] ?: 0.0)
             })
         }
         sessionId
