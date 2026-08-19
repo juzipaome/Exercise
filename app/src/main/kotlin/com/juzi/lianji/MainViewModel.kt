@@ -89,7 +89,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun addExercise(sessionId:Long,exerciseId:String)=viewModelScope.launch { repository.addExercise(sessionId,exerciseId,state.value.settings.defaultRestSeconds) }
     fun finish(id:Long,onDone:(Boolean)->Unit={})=viewModelScope.launch { onDone(repository.finish(id)) }
     fun saveSessionPlan(id:Long,overwrite:Boolean,onDone:(Long)->Unit={})=viewModelScope.launch { onDone(repository.saveSessionPlan(id,overwrite)) }
-    fun addPastWorkout(planId:Long,exerciseIds:List<String>,date:LocalDate,startMinute:Int,endMinute:Int,cardioDistancesKm:Map<String,Double>)=viewModelScope.launch { repository.addPastWorkout(planId,exerciseIds,date,startMinute,endMinute,cardioDistancesKm) }
+    fun addPastWorkout(planId:Long,exerciseIds:List<String>,date:LocalDate,startMinute:Int,endMinute:Int,cardioDistancesKm:Map<String,Double>,cardioDurationsSeconds:Map<String,Int>)=viewModelScope.launch { repository.addPastWorkout(planId,exerciseIds,date,startMinute,endMinute,cardioDistancesKm,cardioDurationsSeconds) }
     fun discard(id:Long)=viewModelScope.launch { repository.discard(id) }
     fun deleteHistory(id:Long)=viewModelScope.launch { repository.deleteHistory(id) }
     fun deleteSchedule(item:ScheduledWorkoutEntity)=viewModelScope.launch { repository.delete(item) }

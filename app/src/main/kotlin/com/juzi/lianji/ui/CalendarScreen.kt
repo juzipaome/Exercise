@@ -40,6 +40,7 @@ import java.time.LocalDate
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.math.roundToInt
 
 @Composable fun CalendarScreen(state:MainUiState,padding:PaddingValues,listState:LazyListState,scrollBehavior:ScrollBehavior,onDay:(String)->Unit,onMonth:(YearMonth)->Unit){
     var monthValue by rememberSaveable{mutableStateOf(YearMonth.now().toString())};val month=YearMonth.parse(monthValue);val offset=month.atDay(1).dayOfWeek.value-1;val summaries=state.days.groupBy{it.localDate};val prefix=month.toString()
@@ -137,6 +138,7 @@ fun DayDetailScreen(vm:MainViewModel,date:String,onBack:()->Unit) {
     var startTime by remember{mutableStateOf("18:00")}
     var endTime by remember{mutableStateOf("19:00")}
     var cardioDistances by remember{mutableStateOf<Map<String,String>>(emptyMap())}
+    var cardioDurations by remember{mutableStateOf<Map<String,String>>(emptyMap())}
     val sessions=state.sessions.filter{it.localDate==date&&it.status!="DISCARDED"}
     val schedules=state.schedules.filter{it.scheduledDate==date}
     MiuixPageScaffold(title=date,navigationIcon={BackButton(onBack)},actions={if(!LocalDate.parse(date).isAfter(LocalDate.now()))IconButton(onClick={showAddPast=true}){Icon(MiuixIcons.Add,"补录过去训练")}}) { pad ->
@@ -165,7 +167,7 @@ fun DayDetailScreen(vm:MainViewModel,date:String,onBack:()->Unit) {
                 Button(onClick={showAddPast=false;candidatePlanId=null},modifier=Modifier.weight(1f)){Text("取消")}
                 Button(
                     enabled=candidatePlanId!=null,
-                    onClick={candidatePlanId?.let { planId -> val plan=state.plans.first{it.id==planId};vm.loadPlan(planId){_,ids->selectedPlanId=planId;selectedPlanName=plan.name;planExerciseIds=ids;selectedExerciseIds=ids.toSet();cardioDistances=emptyMap()} }},
+                    onClick={candidatePlanId?.let { planId -> val plan=state.plans.first{it.id==planId};vm.loadPlan(planId){_,ids->selectedPlanId=planId;selectedPlanName=plan.name;planExerciseIds=ids;selectedExerciseIds=ids.toSet();cardioDistances=emptyMap();cardioDurations=emptyMap()} }},
                     colors=ButtonDefaults.buttonColorsPrimary(),
                     modifier=Modifier.weight(1f),
                 ){Text("下一步")}
@@ -176,13 +178,26 @@ fun DayDetailScreen(vm:MainViewModel,date:String,onBack:()->Unit) {
                 val checked=id in selectedExerciseIds
                 val toggle={selectedExerciseIds=if(checked)selectedExerciseIds-id else selectedExerciseIds+id}
                 CheckboxPreference(title=exercise.nameZh,summary=bodyPartLabel(exercise.bodyPart),checked=checked,onCheckedChange={toggle()},checkboxLocation=CheckboxLocation.End,modifier=Modifier.fillMaxWidth())
-                if(checked&&exercise.trackingMode==TrackingMode.CARDIO)TextField(
-                    value=cardioDistances[id].orEmpty(),
-                    onValueChange={cardioDistances=cardioDistances+(id to it)},
-                    label="距离（km，可选）",
-                    keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),
-                    modifier=Modifier.fillMaxWidth().padding(horizontal=12.dp),
-                )
+                if(checked&&exercise.trackingMode==TrackingMode.CARDIO) {
+                    val selectedCardioCount=selectedExerciseIds.count{selectedId->state.exercises.firstOrNull{it.id==selectedId}?.trackingMode==TrackingMode.CARDIO}
+                    val defaultDurationMinutes = if(selectedCardioCount==1)parseTimeMinute(startTime)?.let { start -> parseTimeMinute(endTime)?.let { end -> (end - start) / 60.0 } } else null
+                    Row(Modifier.fillMaxWidth().padding(horizontal=12.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        TextField(
+                            value=cardioDurations[id] ?: defaultDurationMinutes?.let(::displayDecimal).orEmpty(),
+                            onValueChange={cardioDurations=cardioDurations+(id to it)},
+                            label="时长（分钟）",
+                            keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),
+                            modifier=Modifier.weight(1f),
+                        )
+                        TextField(
+                            value=cardioDistances[id].orEmpty(),
+                            onValueChange={cardioDistances=cardioDistances+(id to it)},
+                            label="距离（km，可选）",
+                            keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),
+                            modifier=Modifier.weight(1f),
+                        )
+                    }
+                }
             } }
             HorizontalDivider()
             Text("训练时间",style=MiuixTheme.textStyles.title3)
@@ -190,10 +205,15 @@ fun DayDetailScreen(vm:MainViewModel,date:String,onBack:()->Unit) {
             val startMinute=parseTimeMinute(startTime);val endMinute=parseTimeMinute(endTime)
             val validTime=startMinute!=null&&endMinute!=null&&endMinute>startMinute
             val selectedCardioIds=selectedExerciseIds.filter{id->state.exercises.firstOrNull{it.id==id}?.trackingMode==TrackingMode.CARDIO}.toSet()
-            val validDistances=selectedCardioIds.all{id->cardioDistances[id].orEmpty().let{it.isBlank()||(it.toDoubleOrNull()?.let{value->value>=0}==true)}}
+            val totalDurationSeconds=if(validTime)(endMinute-startMinute)*60 else 0
+            val validDistances=selectedCardioIds.all{id->cardioDistances[id].orEmpty().let{it.isBlank()||(it.toDoubleOrNull()?.let{value->value.isFinite()&&value>=0}==true)}}
+            val enteredCardioDurationSeconds=selectedCardioIds.mapNotNull{id->cardioDurations[id]?.toDoubleOrNull()?.takeIf{it.isFinite()&&it>0}?.times(60)?.roundToInt()}
+            val allCardioDurationsPresent=selectedCardioIds.size<=1||enteredCardioDurationSeconds.size==selectedCardioIds.size
+            val validDurations=allCardioDurationsPresent&&enteredCardioDurationSeconds.all{it in 1..totalDurationSeconds}&&enteredCardioDurationSeconds.sum()<=totalDurationSeconds
             Text(if(validTime)"训练总时长：${formatLongDuration((endMinute-startMinute)*60L)}" else "请输入同一天内有效的开始与结束时间",color=if(validTime)MiuixTheme.colorScheme.onSurfaceSecondary else StatusColors.Warning)
             if(!validDistances)Text("距离应为不小于 0 的数字",color=StatusColors.Warning)
-            Button(enabled=selectedExerciseIds.isNotEmpty()&&validTime&&validDistances,onClick={vm.addPastWorkout(selectedPlanId!!,planExerciseIds.filter{it in selectedExerciseIds},LocalDate.parse(date),startMinute!!,endMinute!!,selectedCardioIds.associateWith{id->cardioDistances[id]?.toDoubleOrNull()?:0.0});showAddPast=false;selectedPlanId=null},colors=ButtonDefaults.buttonColorsPrimary(),modifier=Modifier.fillMaxWidth()){Text("补录 ${selectedExerciseIds.size} 个动作")}
+            if(!validDurations)Text(if(selectedCardioIds.size>1)"请分别填写有氧时长，合计不能超过训练总时长" else "有氧时长应大于 0 且不超过训练总时长",color=StatusColors.Warning)
+            Button(enabled=selectedExerciseIds.isNotEmpty()&&validTime&&validDistances&&validDurations,onClick={vm.addPastWorkout(selectedPlanId!!,planExerciseIds.filter{it in selectedExerciseIds},LocalDate.parse(date),startMinute!!,endMinute!!,selectedCardioIds.associateWith{id->cardioDistances[id]?.toDoubleOrNull()?:0.0},selectedCardioIds.associateWith{id->(cardioDurations[id]?.toDoubleOrNull()?.times(60)?.roundToInt()?:totalDurationSeconds)});showAddPast=false;selectedPlanId=null},colors=ButtonDefaults.buttonColorsPrimary(),modifier=Modifier.fillMaxWidth()){Text("补录 ${selectedExerciseIds.size} 个动作")}
         }
     }
 }

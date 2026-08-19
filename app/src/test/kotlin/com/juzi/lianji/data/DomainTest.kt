@@ -45,6 +45,31 @@ class DomainTest {
         assertEquals(0, record.reps)
     }
 
+    @Test fun past_cardio_record_accepts_an_individual_duration() {
+        val cardio = ExerciseEntity(
+            id="run",nameEn="Run",nameZh="跑步",bodyPart="cardio",equipment="body weight",
+            target="",muscleGroup="",secondaryMuscles="",instructionsZh="",instructionsEn="",
+            imagePath=null,gifPath=null,attribution="test",trackingMode=TrackingMode.CARDIO,
+        )
+        val record = pastWorkoutSet(cardio,7,0,20.0,10,1_000,1_801_000,5.25,420)
+
+        assertEquals(420, record.durationSeconds)
+    }
+
+    @Test fun non_finite_cardio_distance_is_not_persisted() {
+        val cardio = ExerciseEntity(
+            id="run",nameEn="Run",nameZh="跑步",bodyPart="cardio",equipment="body weight",
+            target="",muscleGroup="",secondaryMuscles="",instructionsZh="",instructionsEn="",
+            imagePath=null,gifPath=null,attribution="test",trackingMode=TrackingMode.CARDIO,
+        )
+
+        assertEquals(0.0, pastWorkoutSet(cardio,7,0,20.0,10,1_000,1_801_000,Double.POSITIVE_INFINITY).distanceKm, 0.001)
+    }
+
+    @Test fun negative_cardio_distance_is_not_persisted() {
+        assertEquals(0.0, normalizedCardioDistance(-1.0), 0.001)
+    }
+
     @Test fun session_exercise_name_remains_a_snapshot_after_library_rename() {
         val snapshot = SessionExerciseEntity(sessionId=1,exerciseId="1",exerciseNameSnapshot="原显示名",position=0,restSeconds=90)
         val renamedLibraryExercise = "更好的中文名"
