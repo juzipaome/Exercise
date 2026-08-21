@@ -29,6 +29,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.juzi.lianji.MainViewModel
+import com.juzi.lianji.LianJiApplication
 import com.juzi.lianji.data.SessionSetRow
 import com.juzi.lianji.data.TrackingMode
 import com.juzi.lianji.data.activeDurationSeconds
@@ -53,7 +54,7 @@ private enum class WorkoutSheet { Exit, Rest }
 fun WorkoutScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit,onAddExercise:()->Unit,onExerciseDetail:(String)->Unit){
     val rows by vm.repository.rows(sessionId).collectAsStateWithLifecycle(emptyList());val session by vm.repository.session(sessionId).collectAsStateWithLifecycle(null);val state by vm.state.collectAsStateWithLifecycle();val context=LocalContext.current
     var now by remember{mutableLongStateOf(System.currentTimeMillis())};var finishedAt by remember{mutableStateOf<Long?>(null)};var notifiedRestId by remember{mutableStateOf<Long?>(null)};var sheetKind by remember{mutableStateOf(WorkoutSheet.Exit)};var showSheet by remember{mutableStateOf(false)};var showPlanUpdate by remember{mutableStateOf(false)}
-    val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){}
+    val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){granted->if(granted)(context.applicationContext as LianJiApplication).workoutNotifications.refresh()}
     LaunchedEffect(Unit){if(ContextCompat.checkSelfPermission(context,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)permission.launch(Manifest.permission.POST_NOTIFICATIONS);while(true){now=System.currentTimeMillis();delay(1_000)}}
     val openRest=rows.lastOrNull{it.restStartedAt!=null&&it.restEndedAt==null};val restRemaining=openRest?.let{(it.restSeconds-((now-it.restStartedAt!!)/1000).toInt()).coerceAtLeast(0)}?:0
     LaunchedEffect(openRest?.setId,restRemaining){if(openRest!=null&&restRemaining==0&&notifiedRestId!=openRest.setId){notifiedRestId=openRest.setId;notifyRest(context,state.settings.vibration,state.settings.sound)}}

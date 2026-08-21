@@ -66,7 +66,7 @@ sealed interface AppScreen : NavKey {
 }
 
 @Composable
-fun LianJiApp(vm: MainViewModel) {
+fun LianJiApp(vm: MainViewModel, requestedWorkoutId: Long? = null, onWorkoutOpened: () -> Unit = {}) {
     val state by vm.state.collectAsStateWithLifecycle()
     val stack = rememberNavBackStack<AppScreen>(AppScreen.Main)
     var mainPage by rememberSaveable { mutableIntStateOf(0) }
@@ -74,6 +74,14 @@ fun LianJiApp(vm: MainViewModel) {
         stack.add(next)
     }
     fun animatedPop(){if(stack.size>1)stack.removeAt(stack.lastIndex)}
+    LaunchedEffect(requestedWorkoutId) {
+        requestedWorkoutId?.let { id ->
+            val target = AppScreen.Workout(id)
+            val existing = stack.indexOf(target)
+            if (existing < 0) stack.add(target) else while (stack.lastIndex > existing) stack.removeAt(stack.lastIndex)
+            onWorkoutOpened()
+        }
+    }
     val renderScreen: @Composable (AppScreen) -> Unit = { current -> when(val s=current) {
         AppScreen.Main -> MainTabs(vm, mainPage, { mainPage = it }, onNavigate=::push)
         AppScreen.NewPlan -> PlanEditorScreen(vm,onBack=::animatedPop,onSave={animatedPop()},onSaveAndStart={id->vm.start(id){animatedPop();push(AppScreen.Workout(it))}},onDetail={push(AppScreen.ExerciseDetail(it))})

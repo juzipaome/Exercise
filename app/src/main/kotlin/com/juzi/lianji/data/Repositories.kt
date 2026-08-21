@@ -153,6 +153,7 @@ class LianJiRepository(private val db: LianJiDatabase) : ExerciseRepository, Pla
     override suspend fun beginSet(id: Long) { db.withTransaction {
         val now = System.currentTimeMillis()
         val sessionId = db.sessionDao().sessionIdForSet(id) ?: return@withTransaction
+        if (db.sessionDao().getSession(sessionId)?.status != "ACTIVE") return@withTransaction
         db.sessionDao().getOpenRest(sessionId)?.let { previous ->
             db.sessionDao().updateSet(previous.copy(restEndedAt = now, restDurationSeconds = ((now - (previous.restStartedAt ?: now)) / 1000).toInt()))
         }
@@ -164,19 +165,22 @@ class LianJiRepository(private val db: LianJiDatabase) : ExerciseRepository, Pla
             db.sessionDao().updateSet(set.copy(startedAt=set.startedAt ?: now,pausedAt=null,pausedDurationMillis=set.pausedDurationMillis+resumedPause))
         }
     } }
-    override suspend fun pauseSet(id: Long) {
+    override suspend fun pauseSet(id: Long) { db.withTransaction {
+        val sessionId = db.sessionDao().sessionIdForSet(id) ?: return@withTransaction
+        if (db.sessionDao().getSession(sessionId)?.status != "ACTIVE") return@withTransaction
         val now = System.currentTimeMillis()
         db.sessionDao().getSet(id)?.takeIf { it.startedAt != null && !it.completed && it.pausedAt == null }
             ?.let { db.sessionDao().updateSet(it.copy(pausedAt=now)) }
-    }
+    } }
     override suspend fun completeSet(id: Long, weight: Double, reps: Int) { db.withTransaction {
         val now = System.currentTimeMillis()
-        val sessionId = db.sessionDao().sessionIdForSet(id)
-        db.sessionDao().getSet(id)?.let { set ->
+        val sessionId = db.sessionDao().sessionIdForSet(id) ?: return@withTransaction
+        if (db.sessionDao().getSession(sessionId)?.status != "ACTIVE") return@withTransaction
+        db.sessionDao().getSet(id)?.takeIf { !it.completed }?.let { set ->
             val started = set.startedAt ?: now
             val pausedMillis=set.pausedDurationMillis+(set.pausedAt?.let{(now-it).coerceAtLeast(0)}?:0)
             db.sessionDao().updateSet(set.copy(weightKg=weight,reps=reps,completed=true,startedAt=started,completedAt=now,durationSeconds=activeDurationSeconds(started,now,null,pausedMillis).toInt(),pausedAt=null,pausedDurationMillis=pausedMillis))
-            if (sessionId != null && db.sessionDao().unfinishedCount(sessionId) > 0) {
+            if (db.sessionDao().unfinishedCount(sessionId) > 0) {
                 db.sessionDao().updateSet(db.sessionDao().getSet(id)!!.copy(restStartedAt=now))
             }
         }
@@ -184,7 +188,9 @@ class LianJiRepository(private val db: LianJiDatabase) : ExerciseRepository, Pla
     override suspend fun updateSetValues(id: Long, weight: Double, reps: Int) { db.sessionDao().updateSetValues(id,weight,reps) }
     override suspend fun completeCardio(id: Long, distanceKm: Double) { db.withTransaction {
         val now = System.currentTimeMillis()
-        db.sessionDao().getSet(id)?.let { record ->
+        val sessionId = db.sessionDao().sessionIdForSet(id) ?: return@withTransaction
+        if (db.sessionDao().getSession(sessionId)?.status != "ACTIVE") return@withTransaction
+        db.sessionDao().getSet(id)?.takeIf { !it.completed }?.let { record ->
             val started = record.startedAt ?: now
             val pausedMillis=record.pausedDurationMillis+(record.pausedAt?.let{(now-it).coerceAtLeast(0)}?:0)
             db.sessionDao().updateSet(record.copy(weightKg=0.0,reps=0,completed=true,startedAt=started,completedAt=now,durationSeconds=activeDurationSeconds(started,now,null,pausedMillis).toInt(),pausedAt=null,pausedDurationMillis=pausedMillis,distanceKm=normalizedCardioDistance(distanceKm)))
