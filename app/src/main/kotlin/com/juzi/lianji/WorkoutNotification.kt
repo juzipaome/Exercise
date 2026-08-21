@@ -141,10 +141,12 @@ class WorkoutNotificationCoordinator(
     private val repository: WorkoutRepository,
 ) {
     @Volatile private var latest: WorkoutNotificationModel? = null
+    private lateinit var scope: CoroutineScope
     private val sequence = AtomicLong(System.currentTimeMillis())
 
     @OptIn(ExperimentalCoroutinesApi::class)
     fun start(scope: CoroutineScope) {
+        this.scope = scope
         scope.launch {
             repository.activeSession.flatMapLatest { session ->
                 if (session == null) flowOf(null)
@@ -157,7 +159,7 @@ class WorkoutNotificationCoordinator(
         }
     }
 
-    fun refresh() { latest?.let(::publish) }
+    fun refresh() { scope.launch { latest?.let(::publish) } }
 
     private fun publish(model: WorkoutNotificationModel) {
         if (context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return

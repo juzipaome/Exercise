@@ -29,6 +29,7 @@ Debug APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。
 - `references/miuix/`：跟踪官方 `main` 的本地 MIUIX 参考源码，不参与 App 构建或主仓库提交。
 - `tools/`：数据完整性检查；UI 验收截图放 `captures/`，不要堆在项目根目录。
 - 整个项目 UI 必须统一使用当前 Maven 已发布的 MIUIX 版本，不得新增 Material UI 组件、自绘已有 MIUIX 图标、自建或仿制 MIUIX 已提供的控件；需要核对最新实现时优先查看 `references/miuix/` 及其中的 `example/`，实际调用必须确认已包含在 App 当前依赖版本中。
+- Android 系统通知等平台 API 仅接受 `Drawable`/`Icon`、无法直接使用 MIUIX `ImageVector` 时，可将当前依赖版本的官方 MIUIX 图标转换为仅供该平台入口使用的本地资源，并按协议添加必要背景；必须保留原版权与 SPDX 许可证，Compose UI 仍不得使用这类副本。
 - 页面进出和返回必须直接使用 MIUIX 0.9.4-rc01 `miuix-nav` 的 `NavDisplay`，不得只复制其曲线自行实现；主 Tab Pager 遵循 0.9.4-rc01 示例的 `MainPagerState` 行为。
 - 确认框遵循示例 App 使用 MIUIX `WindowDialog`，大型选择器经 `FloatingBottomSheet` 入口使用 MIUIX `WindowBottomSheet`；设置页主题、休息时间等紧凑单选项使用 MIUIX `OverlayDropdownPreference`。不得自行使用 Compose `Dialog` 仿制弹层；弹层的进入/收回和点击遮罩收回行为必须由 MIUIX 提供，底部面板的拖动行为也必须由 MIUIX 提供。
 - 弹层内部的菜单、单选和多选同样直接使用当前 MIUIX 示例中的 `OverlayIconDropdownMenu`、`RadioButtonPreference` 和 `CheckboxPreference`，不得用基础布局重新拼装 MIUIX 已提供的选择控件。
