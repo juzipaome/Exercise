@@ -30,7 +30,7 @@ fun PlanEditorScreen(vm:MainViewModel,planId:Long?=null,onBack:()->Unit,onSave:(
     var loaded by rememberSaveable(planId){mutableStateOf(planId==null)}
     LaunchedEffect(planId,loaded){if(planId!=null&&!loaded)vm.loadPlan(planId){plan,ids->name=plan.name;selected=ids;loaded=true}}
     val bodies=remember(state.exercises){state.exercises.map{it.bodyPart}.distinct().sortedBy(::bodyPartLabel)}
-    val visible=state.exercises.filter{(query.isBlank()||it.nameZh.contains(query,true)||it.nameEn.contains(query,true))&&(body.isBlank()||it.bodyPart==body)&&(!favoriteOnly||it.isFavorite)}
+    val visible=state.exercises.filter{(query.isBlank()||it.nameZh.contains(query,true)||it.nameEn.contains(query,true))&&(body.isBlank()||it.bodyPart==body)&&(!favoriteOnly||it.isFavorite)}.sortedBy{if(it.id in selected)0 else 1}
     val canSave=name.isNotBlank()&&selected.isNotEmpty()
     MiuixPageScaffold(
         title=if(planId==null)"创建计划" else "查看与编辑计划",

@@ -1,0 +1,23 @@
+<!-- Copyright 2025, compose-miuix-ui contributors; SPDX-License-Identifier: Apache-2.0 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="1172.4"
+    android:viewportHeight="1172.4">
+    <path
+        android:fillColor="#FF3482FF"
+        android:pathData="M586.2,69.2 A517,517 0,1 1,586.1 69.2 Z" />
+    <group
+        android:pivotX="586.2"
+        android:pivotY="586.2"
+        android:scaleX="0.52"
+        android:scaleY="0.52">
+    <group
+        android:pivotY="586.2"
+        android:scaleY="-1">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M927.7,149.7 V1022.7 Q926.7,1051.7 916.7,1063.2 Q906.7,1074.7 880.7,1074.7 H852.7 Q826.7,1074.7 816.2,1062.7 Q805.7,1050.7 805.7,1022.7 V149.7 Q805.7,121.7 816.2,109.7 Q826.7,97.7 851.7,97.7 H879.7 Q907.7,97.7 917.7,109.7 Q927.7,121.7 927.7,149.7 Z M366.7,149.7 V1022.7 Q365.7,1052.7 355.7,1063.7 Q345.7,1074.7 319.7,1074.7 H291.7 Q264.7,1074.7 254.7,1062.7 Q244.7,1050.7 244.7,1022.7 V149.7 Q244.7,121.7 254.2,109.7 Q263.7,97.7 291.7,97.7 H319.7 Q347.7,97.7 357.2,109.7 Q366.7,121.7 366.7,149.7 Z" />
+    </group>
+    </group>
+</vector>
