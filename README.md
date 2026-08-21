@@ -25,6 +25,12 @@
 .\gradlew.bat assembleDebug
 ```
 
+补充应用签名后可构建 Release
+
+```powershell
+.\gradlew.bat assembleRelease
+```
+
 macOS / Linux：
 
 ```bash
