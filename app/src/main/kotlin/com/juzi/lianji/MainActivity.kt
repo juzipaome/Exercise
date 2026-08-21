@@ -20,6 +20,11 @@ class MainActivity : ComponentActivity() {
         setContent { LianJiApp(mainViewModel, requestedWorkoutId.value) { requestedWorkoutId.value = null } }
     }
 
+    override fun onResume() {
+        super.onResume()
+        (application as LianJiApplication).workoutNotifications.refresh()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
