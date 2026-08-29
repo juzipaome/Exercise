@@ -39,7 +39,7 @@ fun PlanEditorScreen(vm:MainViewModel,planId:Long?=null,onBack:()->Unit,onSave:(
     ) { pad ->
         LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(top=pad.calculateTopPadding()+12.dp,bottom=pad.calculateBottomPadding()+12.dp)) {
             item{TextField(name,{name=it},label="计划名称",useLabelAsPlaceholder=true,modifier=Modifier.cardPadding().fillMaxWidth())}
-            item{TextField(query,{query=it},label="搜索动作",useLabelAsPlaceholder=true,modifier=Modifier.cardPadding().fillMaxWidth())}
+            item{ExerciseSearchBar(query,{query=it},Modifier.cardPadding().fillMaxWidth())}
             item{LazyRow(contentPadding=PaddingValues(horizontal=12.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){item{PlanFilter("已收藏",favoriteOnly){favoriteOnly=!favoriteOnly}};item{PlanFilter("全部",body.isBlank()){body=""}};items(bodies){part->PlanFilter(bodyPartLabel(part),body==part){body=part}}};Spacer(Modifier.height(8.dp))}
             item{SmallTitle("已选 ${selected.size} 个动作 · 当前 ${visible.size} 个结果")}
             items(visible,key={it.id}){ex->val checked=ex.id in selected;ExerciseChoice(ex,checked,{onDetail(ex.id)}){selected=if(checked)selected-ex.id else selected+ex.id}}
@@ -59,7 +59,7 @@ fun WorkoutExercisePickerScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit)
     val visible=state.exercises.filter{(query.isBlank()||it.nameZh.contains(query,true)||it.nameEn.contains(query,true))&&(body.isBlank()||it.bodyPart==body)&&(!favoriteOnly||it.isFavorite)}
     MiuixPageScaffold(title="训练中添加动作",navigationIcon={BackButton(onBack)}){pad->
         LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(top=pad.calculateTopPadding()+12.dp,bottom=24.dp)){
-            item{TextField(query,{query=it},label="搜索动作",useLabelAsPlaceholder=true,modifier=Modifier.cardPadding().fillMaxWidth())}
+            item{ExerciseSearchBar(query,{query=it},Modifier.cardPadding().fillMaxWidth())}
             item{LazyRow(contentPadding=PaddingValues(horizontal=12.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){item{PlanFilter("已收藏",favoriteOnly){favoriteOnly=!favoriteOnly}};item{PlanFilter("全部",body.isBlank()){body=""}};items(bodies){part->PlanFilter(bodyPartLabel(part),body==part){body=part}}};Spacer(Modifier.height(8.dp))}
             item{SmallTitle("当前 ${visible.size} 个结果 · 力量动作 3 组，有氧动作计时 1 次")}
             items(visible,key={it.id}){ex->

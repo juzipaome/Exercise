@@ -1,11 +1,12 @@
 package com.juzi.lianji.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -24,6 +25,7 @@ import top.yukonga.miuix.kmp.theme.LocalDismissState
 import top.yukonga.miuix.kmp.window.WindowDialog
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import top.yukonga.miuix.kmp.squircle.squircleClip
+import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Favorites
@@ -39,7 +41,7 @@ fun ExerciseLibraryScreen(state:MainUiState,padding:PaddingValues,listState:Lazy
         state.exercises.filter{(query.isBlank()||it.nameZh.contains(query,true)||it.nameEn.contains(query,true))&&(body.isBlank()||it.bodyPart==body)&&(equipment.isBlank()||it.equipment==equipment)}
     }
     LazyColumn(Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),state=listState,contentPadding=PaddingValues(top=padding.calculateTopPadding()+12.dp,bottom=padding.calculateBottomPadding()+24.dp)) {
-        item { TextField(query,{query=it},label="搜索动作",useLabelAsPlaceholder=true,modifier=Modifier.cardPadding().fillMaxWidth()) }
+        item { ExerciseSearchBar(query,{query=it},Modifier.cardPadding().fillMaxWidth()) }
         item { Text("训练部位",style=MiuixTheme.textStyles.title3,modifier=Modifier.padding(horizontal=12.dp,vertical=4.dp)) }
         item { LazyRow(contentPadding=PaddingValues(horizontal=12.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){item{FilterButton("全部",body.isBlank()){body=""}};items(bodies){value->FilterButton(bodyPartLabel(value),body==value){body=value}}};Spacer(Modifier.height(8.dp)) }
         item { Text("器械",style=MiuixTheme.textStyles.title3,modifier=Modifier.padding(horizontal=12.dp,vertical=4.dp)) }
@@ -65,7 +67,7 @@ fun ExerciseDetailScreen(vm:MainViewModel,id:String,onBack:()->Unit){
                 }
             }}}
             item{Card(Modifier.cardPadding()){Row(Modifier.fillMaxWidth().padding(18.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)){
-                Surface(modifier=Modifier.size(52.dp),shape=RoundedCornerShape(16.dp),color=MiuixTheme.colorScheme.primary.copy(alpha=0.12f),shadowElevation=0.dp){Box(contentAlignment=Alignment.Center){Text("🏆",style=MiuixTheme.textStyles.title1)}}
+                Surface(modifier=Modifier.size(52.dp).squircleSurface(MiuixTheme.colorScheme.primary.copy(alpha=0.12f),16.dp),color=androidx.compose.ui.graphics.Color.Transparent,shadowElevation=0.dp){Box(contentAlignment=Alignment.Center){Text("🏆",style=MiuixTheme.textStyles.title1)}}
                 Column(Modifier.weight(1f)){Text("个人最佳",style=MiuixTheme.textStyles.title2);Text(personalBestLabel(state.personalBests[e.id]).removePrefix("PB · "),color=MiuixTheme.colorScheme.primary)}
             }}}
             item{Card(Modifier.cardPadding()){Column(Modifier.padding(18.dp)){
@@ -94,7 +96,7 @@ private fun ExerciseRenameSheet(show:Boolean,currentName:String,datasetName:Stri
 fun CustomExerciseScreen(vm:MainViewModel,onBack:()->Unit){
     var name by remember{mutableStateOf("")};var body by remember{mutableStateOf("")};var equipment by remember{mutableStateOf("")};var note by remember{mutableStateOf("")};var trackingMode by remember{mutableStateOf(TrackingMode.STRENGTH)}
     MiuixPageScaffold(title="自定义动作",navigationIcon={BackButton(onBack)}){pad->
-        Column(Modifier.padding(top=pad.calculateTopPadding()+12.dp).padding(horizontal=12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+        Column(Modifier.fillMaxSize().padding(pad).imePadding().verticalScroll(rememberScrollState()).padding(12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
             TextField(name,{name=it},label="动作名称")
             Text("记录方式",style=MiuixTheme.textStyles.title3)
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){

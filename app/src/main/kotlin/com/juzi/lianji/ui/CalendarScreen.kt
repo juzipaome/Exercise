@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -16,13 +15,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.juzi.lianji.MainUiState
 import com.juzi.lianji.MainViewModel
 import com.juzi.lianji.data.*
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.squircle.squircleClip
+import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.preference.RadioButtonLocation
 import top.yukonga.miuix.kmp.preference.RadioButtonPreference
@@ -47,7 +46,7 @@ import kotlin.math.roundToInt
     val completed=state.sessions.filter{it.localDate.startsWith(prefix)&&it.status=="COMPLETED"};val trainingDays=completed.map{it.localDate}.distinct().size;val seconds=completed.sumOf{((it.endedAt?:it.startedAt)-it.startedAt).coerceAtLeast(0)}/1000
     LazyColumn(Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),state=listState,contentPadding=PaddingValues(top=padding.calculateTopPadding()+12.dp,bottom=padding.calculateBottomPadding()+24.dp)){
         item{Card(modifier=Modifier.fillMaxWidth().cardPadding(),pressFeedbackType=PressFeedbackType.Sink,onClick={onMonth(month)}){Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("本月概览",style=MiuixTheme.textStyles.title2);Text("${month.format(DateTimeFormatter.ofPattern("yyyy年 M月"))} · 点击查看详细分析",color=MiuixTheme.colorScheme.onSurfaceSecondary)};Icon(MiuixIcons.ChevronForward,"查看月度分析")};Row(Modifier.fillMaxWidth()){MonthStat(trainingDays.toString(),"训练日",Modifier.weight(1f));MonthStat(completed.size.toString(),"训练次数",Modifier.weight(1f));MonthStat(formatLongDuration(seconds),"总时长",Modifier.weight(1f))}}}}
-        item{Card(Modifier.cardPadding()){Column(Modifier.padding(horizontal=10.dp,vertical=12.dp)){
+        item{Card(Modifier.cardPadding()){Column(Modifier.padding(horizontal=4.dp,vertical=12.dp)){
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){PreviousButton{monthValue=month.minusMonths(1).toString()};Text(month.format(DateTimeFormatter.ofPattern("yyyy年 M月")),style=MiuixTheme.textStyles.title2);NextButton{monthValue=month.plusMonths(1).toString()}}
             Row(Modifier.fillMaxWidth()){listOf("一","二","三","四","五","六","日").forEach{Text(it,Modifier.weight(1f),textAlign=TextAlign.Center,color=MiuixTheme.colorScheme.onSurfaceSecondary)}}
             repeat(6) { week ->
@@ -61,16 +60,16 @@ import kotlin.math.roundToInt
                                 onClick = { onDay(date) },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(70.dp)
-                                    .padding(horizontal = 1.dp, vertical = 2.dp),
-                                shape = RoundedCornerShape(14.dp),
+                                    .height(76.dp)
+                                    .padding(horizontal = 1.dp, vertical = 2.dp)
+                                    .squircleClip(14.dp),
                                 color = Color.Transparent,
                                 shadowElevation = 0.dp,
                             ) {
                                 Column(
                                     Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 1.dp, vertical = 2.dp),
+                                        .padding(vertical = 2.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                 ) {
                                     Text(day.toString())
@@ -79,24 +78,21 @@ import kotlin.math.roundToInt
                                         Surface(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(top = 1.dp),
-                                            shape = RoundedCornerShape(6.dp),
-                                            color = if (completedEntry) {
+                                                .padding(top = 1.dp)
+                                                .squircleSurface(if (completedEntry) {
                                                 StatusColors.Healthy.copy(alpha = .14f)
                                             } else {
                                                 StatusColors.Warning.copy(alpha = .14f)
-                                            },
+                                            },6.dp),
+                                            color = Color.Transparent,
                                             shadowElevation = 0.dp,
                                         ) {
                                             Text(
                                                 entry.title,
                                                 Modifier
                                                     .fillMaxWidth()
-                                                    .padding(horizontal = 1.dp, vertical = 1.dp),
-                                                style = MiuixTheme.textStyles.footnote2.copy(
-                                                    fontSize = 9.sp,
-                                                    letterSpacing = (-0.35).sp,
-                                                ),
+                                                    .padding(vertical = 1.dp),
+                                                style = MiuixTheme.textStyles.footnote2,
                                                 maxLines = 1,
                                                 textAlign = TextAlign.Center,
                                                 color = if (completedEntry) {
@@ -117,7 +113,7 @@ import kotlin.math.roundToInt
                                 }
                             }
                         } else {
-                            Spacer(Modifier.weight(1f).height(70.dp))
+                            Spacer(Modifier.weight(1f).height(76.dp))
                         }
                     }
                 }
@@ -212,9 +208,9 @@ fun DayDetailScreen(vm:MainViewModel,date:String,onBack:()->Unit) {
             val allCardioDurationsValid=selectedCardioIds.isEmpty()||singleBlankUsesTotal||parsedCardioDurations.values.all{it!=null}
             val effectiveCardioDurations=selectedCardioIds.associateWith{id->parsedCardioDurations[id]?:totalDurationSeconds}
             val validDurations=allCardioDurationsValid&&effectiveCardioDurations.values.sum()<=totalDurationSeconds
-            Text(if(validTime)"训练总时长：${formatLongDuration(totalDurationSeconds.toLong())}" else "请输入同一天内有效的开始与结束时间",color=if(validTime)MiuixTheme.colorScheme.onSurfaceSecondary else StatusColors.Warning)
-            if(!validDistances)Text("距离应为不小于 0 的数字",color=StatusColors.Warning)
-            if(!validDurations)Text(if(selectedCardioIds.size>1)"请分别填写有氧时长，合计不能超过训练总时长" else "有氧时长应大于 0 且不超过训练总时长",color=StatusColors.Warning)
+            Text(if(validTime)"训练总时长：${formatLongDuration(totalDurationSeconds.toLong())}" else "请输入同一天内有效的开始与结束时间",color=if(validTime)MiuixTheme.colorScheme.onSurfaceSecondary else MiuixTheme.colorScheme.error)
+            if(!validDistances)Text("距离应为不小于 0 的数字",color=MiuixTheme.colorScheme.error)
+            if(!validDurations)Text(if(selectedCardioIds.size>1)"请分别填写有氧时长，合计不能超过训练总时长" else "有氧时长应大于 0 且不超过训练总时长",color=MiuixTheme.colorScheme.error)
             Button(enabled=selectedExerciseIds.isNotEmpty()&&validTime&&validDistances&&validDurations,onClick={vm.addPastWorkout(selectedPlanId!!,planExerciseIds.filter{it in selectedExerciseIds},LocalDate.parse(date),startMinute!!,endMinute!!,selectedCardioIds.associateWith{id->cardioDistances[id]?.toDoubleOrNull()?:0.0},effectiveCardioDurations);showAddPast=false;selectedPlanId=null},colors=ButtonDefaults.buttonColorsPrimary(),modifier=Modifier.fillMaxWidth()){Text("补录 ${selectedExerciseIds.size} 个动作")}
         }
     }
@@ -229,7 +225,7 @@ private fun SessionHistoryCard(vm:MainViewModel,session:WorkoutSessionEntity) {
     val seconds=((session.endedAt?:System.currentTimeMillis())-session.startedAt)/1000
     Card(Modifier.cardPadding()) {
         Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            Surface(onClick={expanded=!expanded},modifier=Modifier.fillMaxWidth().padding(vertical=4.dp),shape=RoundedCornerShape(14.dp),color=Color.Transparent,shadowElevation=0.dp) {
+            Surface(onClick={expanded=!expanded},modifier=Modifier.fillMaxWidth().padding(vertical=4.dp).squircleClip(14.dp),color=Color.Transparent,shadowElevation=0.dp) {
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)){Text(session.planNameSnapshot,style=MiuixTheme.textStyles.title2);Text("${if(session.status=="COMPLETED")"已完成" else "进行中"} · ${groups.size} 个动作 · ${formatDuration(seconds)}",color=MiuixTheme.colorScheme.onSurfaceSecondary)}
                 IconButton(onClick={expanded=!expanded}){Icon(if(expanded)MiuixIcons.ExpandLess else MiuixIcons.ExpandMore,if(expanded)"收起详情" else "展开详情")}
@@ -238,7 +234,7 @@ private fun SessionHistoryCard(vm:MainViewModel,session:WorkoutSessionEntity) {
             AnimatedVisibility(expanded,enter=expandVertically(animationSpec=folmeSpring(.9f,.32f))+fadeIn(folmeSpring(.9f,.28f)),exit=shrinkVertically(animationSpec=folmeSpring(.92f,.28f))+fadeOut(folmeSpring(.95f,.24f))) {
                 Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
                     if(groups.isEmpty()) Text("这次训练没有已完成的记录",color=MiuixTheme.colorScheme.onSurfaceSecondary) else groups.forEach{HistoryExercise(it,vm::updateSetValues,vm::updateCardioValues)}
-                    Card{TextButton("删除训练记录",onClick={confirm=true},modifier=Modifier.fillMaxWidth())}
+                    TextButton("删除训练记录",onClick={confirm=true},modifier=Modifier.fillMaxWidth())
                 }
             }
         }

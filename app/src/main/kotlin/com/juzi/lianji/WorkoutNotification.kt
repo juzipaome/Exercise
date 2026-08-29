@@ -206,7 +206,7 @@ class WorkoutNotificationCoordinator(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val builder = Notification.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setSmallIcon(R.drawable.ic_notification_play)
             .setContentTitle(model.title)
             .setContentText(model.status + if (model.timerType == WorkoutTimerType.Static) " · ${formatDuration(model.staticSeconds)}" else "")
             .setContentIntent(contentIntent)
