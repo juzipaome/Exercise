@@ -2,6 +2,14 @@
 
 练迹是一款仅支持 Android、离线优先的个人健身计划与训练记录 App。动作数据内置在应用中，运行时无需联网获取。
 
+## 界面预览
+
+<p align="center">
+  <img src="docs/screenshots/home.png" alt="训练计划首页" width="30%" />
+  <img src="docs/screenshots/calendar.png" alt="训练日历" width="30%" />
+  <img src="docs/screenshots/exercise-library.png" alt="离线动作库" width="30%" />
+</p>
+
 ## 功能
 
 - 创建训练计划，并按日期安排训练
