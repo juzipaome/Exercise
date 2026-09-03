@@ -35,8 +35,8 @@ import com.juzi.lianji.data.TrackingMode
 import com.juzi.lianji.data.activeDurationSeconds
 import com.juzi.lianji.data.nextWorkoutSet
 import com.juzi.lianji.data.orderedWorkoutGroups
+import com.juzi.lianji.data.startedWorkoutGroupIndex
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -59,8 +59,10 @@ fun WorkoutScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit,onAddExercise:
     val openRest=rows.lastOrNull{it.restStartedAt!=null&&it.restEndedAt==null};val restRemaining=openRest?.let{(it.restSeconds-((now-it.restStartedAt!!)/1000).toInt()).coerceAtLeast(0)}?:0
     LaunchedEffect(openRest?.setId,restRemaining){if(openRest!=null&&restRemaining==0&&notifiedRestId!=openRest.setId){notifiedRestId=openRest.setId;notifyRest(context,state.settings.vibration,state.settings.sound)}}
     val totalSeconds=session?.let{((finishedAt?:it.endedAt?:now)-it.startedAt)/1000}?:0
-    val isFinished=finishedAt!=null||session?.status=="COMPLETED";val currentRest=rows.firstOrNull()?.restSeconds?:state.settings.defaultRestSeconds;val workoutListState=rememberLazyListState();val scope=rememberCoroutineScope()
+    val isFinished=finishedAt!=null||session?.status=="COMPLETED";val currentRest=rows.firstOrNull()?.restSeconds?:state.settings.defaultRestSeconds;val workoutListState=rememberLazyListState();var pendingScrollSetId by remember{mutableStateOf<Long?>(null)}
     val exerciseGroups=orderedWorkoutGroups(rows)
+    LaunchedEffect(rows,pendingScrollSetId){pendingScrollSetId?.let{setId->startedWorkoutGroupIndex(rows,setId)?.let{target->workoutListState.animateScrollToItem(target);pendingScrollSetId=null}}}
+    fun beginSet(setId:Long){pendingScrollSetId=setId;vm.beginSet(setId)}
     fun openSheet(kind:WorkoutSheet){sheetKind=kind;showSheet=true}
     BackHandler{if(isFinished)onBack()else openSheet(WorkoutSheet.Exit)}
     Box(Modifier.fillMaxSize()){
@@ -70,11 +72,11 @@ fun WorkoutScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit,onAddExercise:
             else BoxWithConstraints(Modifier.fillMaxSize().padding(top=pad.calculateTopPadding())){
                 val positioningTail=maxHeight*.62f
                 LazyColumn(Modifier.fillMaxSize(),state=workoutListState,contentPadding=PaddingValues(top=if(openRest!=null)164.dp else 12.dp,bottom=positioningTail)){
-                    exerciseGroups.forEach{sets->val first=sets.first();val exerciseId=first.sessionExerciseId;item(key="exercise-$exerciseId"){if(first.trackingMode==TrackingMode.CARDIO)CardioWorkoutCard(sets,now,{onExerciseDetail(first.exerciseId)},vm::beginSet,vm::pauseSet,vm::completeCardio,vm::updateCardioValues,vm::deleteSet)else ExerciseWorkoutCard(sets,now,{onExerciseDetail(first.exerciseId)},{vm.beginSet(it)},{vm.pauseSet(it)},{id,w,r->vm.completeSet(id,w,r)},vm::updateSetValues,vm::deleteSet){val last=sets.last();vm.addSet(exerciseId,sets.size,last.weightKg,last.reps)}}}
+                    exerciseGroups.forEach{sets->val first=sets.first();val exerciseId=first.sessionExerciseId;item(key="exercise-$exerciseId"){if(first.trackingMode==TrackingMode.CARDIO)CardioWorkoutCard(sets,now,{onExerciseDetail(first.exerciseId)},::beginSet,vm::pauseSet,vm::completeCardio,vm::updateCardioValues,vm::deleteSet)else ExerciseWorkoutCard(sets,now,{onExerciseDetail(first.exerciseId)},::beginSet,{vm.pauseSet(it)},{id,w,r->vm.completeSet(id,w,r)},vm::updateSetValues,vm::deleteSet){val last=sets.last();vm.addSet(exerciseId,sets.size,last.weightKg,last.reps)}}}
                 }
                 AnimatedVisibility(openRest!=null,modifier=Modifier.align(Alignment.TopCenter),enter=slideInVertically(folmeSpring(.88f,.35f)){-it}+fadeIn(folmeSpring(.9f,.3f)),exit=slideOutVertically(folmeSpring(.92f,.3f)){-it}+fadeOut(folmeSpring(.95f,.25f))){
                     openRest?.let{rest->HeroCard(if(restRemaining>0)"组间休息 ${formatDuration(restRemaining.toLong())}" else "休息结束","上一组 ${formatDuration(rest.durationSeconds.toLong())} · 已休息 ${formatDuration(((now-rest.restStartedAt!!)/1000).coerceAtLeast(0))}","开始下一项"){
-                        nextWorkoutSet(rows,rest.setId)?.let{next->vm.beginSet(next.setId);scope.launch{delay(100);val reordered=orderedWorkoutGroups(rows);val target=reordered.indexOfFirst{it.first().sessionExerciseId==next.sessionExerciseId}.coerceAtLeast(0);workoutListState.animateScrollToItem(target)}}
+                        nextWorkoutSet(rows,rest.setId)?.let{next->beginSet(next.setId)}
                     }}
                 }
             }

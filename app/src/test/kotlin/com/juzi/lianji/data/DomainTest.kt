@@ -112,6 +112,16 @@ class DomainTest {
         )
     }
 
+    @Test fun selected_lower_exercise_reports_its_new_position_after_it_starts() {
+        val rows = listOf(
+            workoutRow(1, 10, "已开始", exercisePosition=0, startedAt=100),
+            workoutRow(2, 20, "未开始", exercisePosition=1),
+            workoutRow(3, 30, "刚选择", exercisePosition=2, startedAt=200),
+        )
+
+        assertEquals(1, startedWorkoutGroupIndex(rows, setId=3))
+    }
+
     @Test fun rest_continues_the_exercise_just_completed_instead_of_plan_first() {
         val rows = listOf(
             workoutRow(1, 10, "计划第一项", exercisePosition=0),

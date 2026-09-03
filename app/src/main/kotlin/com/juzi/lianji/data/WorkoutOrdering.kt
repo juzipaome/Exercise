@@ -27,6 +27,11 @@ fun orderedWorkoutGroups(rows: List<SessionSetRow>): List<List<SessionSetRow>> =
             ),
         )
 
+fun startedWorkoutGroupIndex(rows: List<SessionSetRow>, setId: Long): Int? {
+    val exerciseId = rows.firstOrNull { it.setId == setId && it.startedAt != null }?.sessionExerciseId ?: return null
+    return orderedWorkoutGroups(rows).indexOfFirst { it.first().sessionExerciseId == exerciseId }.takeIf { it >= 0 }
+}
+
 /**
  * After rest, continue the exercise the user just completed before moving to
  * another exercise. This deliberately does not use the plan's first unfinished
