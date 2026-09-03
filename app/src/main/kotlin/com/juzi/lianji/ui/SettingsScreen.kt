@@ -1,6 +1,5 @@
 package com.juzi.lianji.ui
 
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -17,7 +16,6 @@ import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.*
 
@@ -28,10 +26,9 @@ fun SettingsScreen(state:MainUiState,padding:PaddingValues,listState:LazyListSta
         item{Card(Modifier.cardPadding()){Column{OverlayDropdownPreference(items=themeOptions,selectedIndex=themeModes.indexOf(state.settings.themeMode).coerceAtLeast(0),title="主题模式",startAction={Icon(MiuixIcons.Theme,null)},onSelectedIndexChange={scope.launch{vm.settingsStore.setTheme(themeModes[it])}});SwitchPreference(checked=state.settings.dynamicColor,onCheckedChange={scope.launch{vm.settingsStore.setDynamic(it)}},title="Monet 动态色",summary="跟随系统壁纸生成应用强调色")}}}
         item{SmallTitle("训练提醒")}
         item{Card(Modifier.cardPadding()){Column{OverlayDropdownPreference(items=restOptions.map(::formatRestLabel),selectedIndex=restOptions.indexOf(state.settings.defaultRestSeconds).coerceAtLeast(0),title="默认组间休息",startAction={Icon(MiuixIcons.Timer,null)},onSelectedIndexChange={scope.launch{vm.settingsStore.setRest(restOptions[it])}});SwitchPreference(checked=state.settings.vibration,onCheckedChange={scope.launch{vm.settingsStore.setVibration(it)}},title="震动提醒",summary="休息结束时振动提示");SwitchPreference(checked=state.settings.sound,onCheckedChange={scope.launch{vm.settingsStore.setSound(it)}},title="提示音",summary="休息结束时播放提示音")}}}
-        item{SmallTitle("数据与应用")}
-        item{Card(Modifier.cardPadding()){Column{ArrowPreference(title="导出备份",summary="将计划、日程与历史导出为 JSON",startAction={Icon(MiuixIcons.UploadCloud,null)},onClick={export.launch("练迹备份.json")});ArrowPreference(title="恢复备份",summary="恢复前会校验文件，不覆盖损坏数据",startAction={Icon(MiuixIcons.Import,null)},onClick={import.launch(arrayOf("application/json"))});ArrowPreference(title="关于练迹",summary="动作来源、媒体授权与开源许可",startAction={Icon(MiuixIcons.Info,null)},onClick=onAbout)}}}
+        item{SmallTitle("数据")}
+        item{Card(Modifier.cardPadding()){Column{ArrowPreference(title="导出备份",summary="将计划、日程与历史导出为 JSON",startAction={Icon(MiuixIcons.UploadCloud,null)},onClick={export.launch("练迹备份.json")});ArrowPreference(title="恢复备份",summary="恢复前会校验文件，不覆盖损坏数据",startAction={Icon(MiuixIcons.Import,null)},onClick={import.launch(arrayOf("application/json"))})}}}
+        item{SmallTitle("应用")}
+        item{Card(Modifier.cardPadding()){ArrowPreference(title="关于练迹",summary="版本、数据来源、媒体授权与开源许可",startAction={Icon(MiuixIcons.Info,null)},onClick=onAbout)}}
     }
 }
-
-@Composable fun AboutScreen(onBack:()->Unit){MiuixPageScaffold(title="关于",navigationIcon={BackButton(onBack)}){pad->LazyColumn(contentPadding=PaddingValues(top=pad.calculateTopPadding()+12.dp,bottom=24.dp)){item{Card(Modifier.cardPadding()){Column(Modifier.padding(20.dp)){Text("练迹",style=MiuixTheme.textStyles.title1);Text("0.1.0 · 私人离线健身记录",color=MiuixTheme.colorScheme.onSurfaceSecondary);Spacer(Modifier.height(18.dp));Text("动作数据");Text("hasaneyldrm/exercises-dataset，数据与说明采用 MIT License。");Spacer(Modifier.height(12.dp));Text("动作媒体");Text("© Gym visual — https://gymvisual.com/\n本应用中的 180×180 图片和 GIF 按个人授权使用。未经重新确认授权，不应公开分发媒体版本。",color=MiuixTheme.colorScheme.onSurfaceSecondary);Spacer(Modifier.height(12.dp));Text("界面");Text("MIUIX 0.9.4-rc01 · Apache-2.0")}}}}}}
-
