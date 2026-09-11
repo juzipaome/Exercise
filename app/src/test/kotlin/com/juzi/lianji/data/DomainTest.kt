@@ -99,6 +99,44 @@ class DomainTest {
         assertEquals(false,hasPlanStructureChanges(planItems,sessionExercises,mapOf(11L to 1)))
     }
 
+    @Test fun exercise_reordering_is_detected_as_plan_change() {
+        val planItems=listOf(
+            PlanExerciseEntity(planId=1,exerciseId="squat",position=0),
+            PlanExerciseEntity(planId=1,exerciseId="bench",position=1),
+        )
+        val sessionExercises=listOf(
+            SessionExerciseEntity(id=10,sessionId=2,exerciseId="bench",exerciseNameSnapshot="卧推",position=0,restSeconds=90),
+            SessionExerciseEntity(id=11,sessionId=2,exerciseId="squat",exerciseNameSnapshot="深蹲",position=1,restSeconds=90),
+        )
+
+        assertEquals(true,hasPlanStructureChanges(planItems,sessionExercises,mapOf(10L to 3,11L to 3)))
+    }
+
+    @Test fun reordered_exercises_are_contiguous_and_keep_unmentioned_items() {
+        val exercises=listOf(
+            SessionExerciseEntity(id=10,sessionId=2,exerciseId="a",exerciseNameSnapshot="A",position=0,restSeconds=90),
+            SessionExerciseEntity(id=11,sessionId=2,exerciseId="b",exerciseNameSnapshot="B",position=1,restSeconds=90),
+            SessionExerciseEntity(id=12,sessionId=2,exerciseId="c",exerciseNameSnapshot="C",position=2,restSeconds=90),
+        )
+
+        assertEquals(listOf(12L,10L,11L),normalizedExerciseOrder(exercises,listOf(12,10,12,99)).map{it.id})
+        assertEquals(listOf(0,1,2),normalizedExerciseOrder(exercises,listOf(12,10)).map{it.position})
+    }
+
+    @Test fun remaining_sets_are_renumbered_after_deletion() {
+        val sets=listOf(
+            WorkoutSetEntity(id=1,sessionExerciseId=10,position=0,weightKg=10.0,reps=10),
+            WorkoutSetEntity(id=3,sessionExerciseId=10,position=2,weightKg=10.0,reps=10),
+            WorkoutSetEntity(id=4,sessionExerciseId=10,position=3,weightKg=10.0,reps=10),
+        )
+
+        assertEquals(listOf(0,1,2),reindexedSetPositions(sets).map{it.position})
+    }
+
+    @Test fun dragged_item_moves_to_the_target_position() {
+        assertEquals(listOf("B","C","A"),movedItem(listOf("A","B","C"),0,2))
+    }
+
     @Test fun workout_order_follows_the_exercises_the_user_actually_started() {
         val rows = listOf(
             workoutRow(1, 10, "计划第一项", exercisePosition=0),

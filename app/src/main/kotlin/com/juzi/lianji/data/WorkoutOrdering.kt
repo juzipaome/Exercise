@@ -11,6 +11,10 @@ fun activeDurationSeconds(
     return ((countingUntil - started - pausedDurationMillis).coerceAtLeast(0) / 1000)
 }
 
+fun <T> movedItem(items:List<T>,from:Int,to:Int):List<T> =
+    if(from==to||from !in items.indices||to !in items.indices)items
+    else items.toMutableList().apply{add(to,removeAt(from))}
+
 /**
  * Keeps exercises that have actually been started in the order the user first
  * touched them. Exercises that have not been started yet retain their plan order.

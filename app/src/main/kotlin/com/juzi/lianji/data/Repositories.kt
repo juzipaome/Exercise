@@ -48,6 +48,7 @@ interface WorkoutRepository {
     suspend fun setSessionRest(sessionId: Long, seconds: Int)
     suspend fun addSet(sessionExerciseId: Long, position: Int, weight: Double, reps: Int)
     suspend fun deleteSet(id: Long)
+    suspend fun reorderExercises(sessionId: Long, orderedIds: List<Long>)
     suspend fun addExercise(sessionId: Long, exerciseId: String, restSeconds: Int)
     suspend fun finish(id: Long): Boolean
     suspend fun saveSessionPlan(id: Long, overwrite: Boolean): Long
@@ -60,6 +61,12 @@ fun trainingVolume(rows: List<SessionSetRow>): Double = rows.filter { it.complet
 fun initialRecordCount(exercise: ExerciseEntity, strengthSets: Int): Int = if (exercise.isCardio) 1 else strengthSets
 fun initialReps(exercise: ExerciseEntity, strengthReps: Int): Int = if (exercise.isCardio) 0 else strengthReps
 fun normalizedCardioDistance(value: Double): Double = value.takeIf { it.isFinite() && it >= 0.0 } ?: 0.0
+fun reindexedSetPositions(sets:List<WorkoutSetEntity>)=sets.mapIndexed{position,set->set.copy(position=position)}
+fun normalizedExerciseOrder(exercises:List<SessionExerciseEntity>,orderedIds:List<Long>):List<SessionExerciseEntity> {
+    val requested=orderedIds.distinct().mapNotNull(exercises.associateBy(SessionExerciseEntity::id)::get)
+    val requestedIds=requested.map(SessionExerciseEntity::id).toSet()
+    return (requested+exercises.filterNot{it.id in requestedIds}).mapIndexed{index,item->item.copy(position=index)}
+}
 data class PastWorkoutTimeRange(val startedAt:Long,val endedAt:Long) {
     val durationSeconds:Int get()=((endedAt-startedAt)/1000).coerceAtLeast(0).toInt()
 }
@@ -96,6 +103,7 @@ fun hasPlanStructureChanges(
 ): Boolean {
     val planByExercise = planItems.associateBy { it.exerciseId }
     if (sessionExercises.any { it.exerciseId !in planByExercise }) return true
+    if (planItems.sortedBy { it.position }.map { it.exerciseId } != sessionExercises.sortedBy { it.position }.map { it.exerciseId }) return true
     return sessionExercises.any { exercise ->
         val planItem = planByExercise.getValue(exercise.exerciseId)
         val expected = if (exercise.trackingMode == TrackingMode.CARDIO) 1 else planItem.defaultSets
@@ -207,7 +215,16 @@ class LianJiRepository(private val db: LianJiDatabase) : ExerciseRepository, Pla
         val recordCount = initialRecordCount(exercise,3)
         db.sessionDao().insertSets(List(recordCount) { index -> WorkoutSetEntity(sessionExerciseId=id,position=index,weightKg=0.0,reps=initialReps(exercise,10)) })
     } }
-    override suspend fun deleteSet(id: Long) = db.sessionDao().deleteSet(id)
+    override suspend fun deleteSet(id: Long) { db.withTransaction {
+        val target=db.sessionDao().getSet(id) ?: return@withTransaction
+        db.sessionDao().deleteSet(id)
+        reindexedSetPositions(db.sessionDao().getSetsForExercise(target.sessionExerciseId)).forEach{set->
+            db.sessionDao().updateSet(set)
+        }
+    } }
+    override suspend fun reorderExercises(sessionId:Long,orderedIds:List<Long>) { db.withTransaction {
+        normalizedExerciseOrder(db.sessionDao().getSessionExercises(sessionId),orderedIds).forEach{db.sessionDao().updateSessionExercise(it)}
+    } }
     override suspend fun finish(id: Long): Boolean = db.withTransaction {
         val now = System.currentTimeMillis()
         db.sessionDao().getOpenRest(id)?.let { rest -> db.sessionDao().updateSet(rest.copy(restEndedAt=now,restDurationSeconds=((now-(rest.restStartedAt?:now))/1000).toInt())) }

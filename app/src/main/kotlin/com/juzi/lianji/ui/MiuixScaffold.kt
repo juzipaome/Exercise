@@ -20,6 +20,7 @@ import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.SearchBar
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.ToolbarPosition
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurDefaults
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
@@ -35,6 +36,8 @@ fun MiuixPageScaffold(
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
+    floatingToolbar: @Composable () -> Unit = {},
+    floatingToolbarPosition: ToolbarPosition = ToolbarPosition.BottomCenter,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val surfaceColor = MiuixTheme.colorScheme.surface
@@ -73,6 +76,8 @@ fun MiuixPageScaffold(
             }
         },
         bottomBar = bottomBar,
+        floatingToolbar = floatingToolbar,
+        floatingToolbarPosition = floatingToolbarPosition,
     ) { padding ->
         Box(
             modifier = Modifier

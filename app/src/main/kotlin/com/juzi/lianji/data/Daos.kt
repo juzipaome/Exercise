@@ -84,6 +84,7 @@ interface SessionDao {
     @Insert suspend fun insertSession(item: WorkoutSessionEntity): Long
     @Update suspend fun updateSession(item: WorkoutSessionEntity)
     @Insert suspend fun insertSessionExercise(item: SessionExerciseEntity): Long
+    @Update suspend fun updateSessionExercise(item: SessionExerciseEntity)
     @Query("SELECT * FROM session_exercises") suspend fun getAllExercises(): List<SessionExerciseEntity>
     @Query("SELECT * FROM session_exercises WHERE sessionId=:sessionId ORDER BY position") suspend fun getSessionExercises(sessionId: Long): List<SessionExerciseEntity>
     @Query("SELECT COALESCE(MAX(position), -1) FROM session_exercises WHERE sessionId=:sessionId") suspend fun maxExercisePosition(sessionId: Long): Int

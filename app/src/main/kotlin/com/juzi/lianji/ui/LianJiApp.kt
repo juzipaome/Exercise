@@ -13,12 +13,17 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.juzi.lianji.MainViewModel
 import com.juzi.lianji.MainUiState
+import com.juzi.lianji.data.AppSettings
+import com.juzi.lianji.ui.liquid.IosLiquidGlassNavigationBar
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.job
@@ -27,6 +32,8 @@ import kotlinx.serialization.Serializable
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurDefaults
+import top.yukonga.miuix.kmp.blur.BlurColors
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.textureBlur
@@ -149,6 +156,7 @@ private fun MainTabs(vm:MainViewModel,selectedPage:Int,onSelectedPage:(Int)->Uni
     val labels=listOf("运动","日历","动作库","设置")
     val subtitles=listOf("今天也为自己积累一点进步","按月回看你的训练轨迹","离线动作库，随时可查","让练迹更符合你的使用习惯")
     val icons=listOf(MiuixIcons.Home,MiuixIcons.Months,MiuixIcons.All,MiuixIcons.Settings)
+    val navigationItems=labels.zip(icons){label,icon->NavigationItem(label,icon)}
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide=maxWidth>=600.dp
         val surfaceColor=MiuixTheme.colorScheme.surface
@@ -202,9 +210,7 @@ private fun MainTabs(vm:MainViewModel,selectedPage:Int,onSelectedPage:(Int)->Uni
                         }
                     }
                 },
-                bottomBar={ if(!wide) Box(
-                    Modifier.textureBlur(backdrop=backdrop,shape=RectangleShape,blurRadius=25f,colors=navigationBarBlurColors),
-                ) { NavigationBar(color=Color.Transparent) { labels.forEachIndexed { i,label -> NavigationBarItem(selected=mainPagerState.selectedPage==i,onClick={mainPagerState.animateToPage(i)},icon=icons[i],label=label) } } } },
+                bottomBar={if(!wide) MainNavigationBar(state.settings,navigationItems,mainPagerState,backdrop,navigationBarBlurColors)},
                 snackbarHost={SnackbarHost(snackbarHostState)},
             ) { padding ->
                 Box(Modifier.fillMaxSize().layerBackdrop(backdrop)) {
@@ -217,6 +223,33 @@ private fun MainTabs(vm:MainViewModel,selectedPage:Int,onSelectedPage:(Int)->Uni
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MainNavigationBar(
+    settings:AppSettings,
+    items:List<NavigationItem>,
+    pagerState:MainPagerState,
+    backdrop:LayerBackdrop,
+    blurColors:BlurColors,
+) {
+    val page=pagerState.selectedPage
+    when(settings.navigationBarStyle) {
+        "FLOATING" -> {
+            val shape:Shape=RoundedCornerShape(FloatingToolbarDefaults.CornerRadius)
+            FloatingNavigationBar(
+                modifier=Modifier.textureBlur(backdrop=backdrop,shape=shape,blurRadius=25f,colors=BlurDefaults.blurColors(blendColors=listOf(BlendColorEntry(MiuixTheme.colorScheme.surfaceContainer.copy(alpha=.6f))))),
+                color=Color.Transparent,
+                horizontalAlignment=when(settings.floatingNavigationBarPosition){"START"->Alignment.Start;"END"->Alignment.End;else->Alignment.CenterHorizontally},
+            ) { items.forEachIndexed{i,item->FloatingNavigationBarItem(selected=page==i,onClick={pagerState.animateToPage(i)},icon=item.icon,label=item.label)} }
+        }
+        "LIQUID" -> IosLiquidGlassNavigationBar(items,page,{pagerState.animateToPage(it)},backdrop,true)
+        else -> Box(Modifier.textureBlur(backdrop=backdrop,shape=RectangleShape,blurRadius=25f,colors=blurColors)) {
+            NavigationBar(color=Color.Transparent,mode=when(settings.navigationBarMode){"ICON_ONLY"->NavigationBarDisplayMode.IconOnly;"SELECTED_LABEL"->NavigationBarDisplayMode.IconWithSelectedLabel;else->NavigationBarDisplayMode.IconAndText}) {
+                items.forEachIndexed{i,item->NavigationBarItem(selected=page==i,onClick={pagerState.animateToPage(i)},icon=item.icon,label=item.label)}
             }
         }
     }

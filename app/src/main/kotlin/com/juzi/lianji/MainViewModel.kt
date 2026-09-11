@@ -86,6 +86,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setSessionRest(id:Long,seconds:Int)=viewModelScope.launch { repository.setSessionRest(id,seconds) }
     fun addSet(sessionExerciseId:Long,position:Int,weight:Double,reps:Int)=viewModelScope.launch { repository.addSet(sessionExerciseId,position,weight,reps) }
     fun deleteSet(id:Long)=viewModelScope.launch { repository.deleteSet(id) }
+    fun reorderExercises(sessionId:Long,orderedIds:List<Long>)=viewModelScope.launch { repository.reorderExercises(sessionId,orderedIds) }
     fun addExercise(sessionId:Long,exerciseId:String)=viewModelScope.launch { repository.addExercise(sessionId,exerciseId,state.value.settings.defaultRestSeconds) }
     fun finish(id:Long,onDone:(Boolean)->Unit={})=viewModelScope.launch { onDone(repository.finish(id)) }
     fun saveSessionPlan(id:Long,overwrite:Boolean,onDone:(Long)->Unit={})=viewModelScope.launch { onDone(repository.saveSessionPlan(id,overwrite)) }
