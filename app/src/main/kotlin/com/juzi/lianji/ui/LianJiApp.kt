@@ -17,13 +17,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.juzi.lianji.MainViewModel
 import com.juzi.lianji.MainUiState
 import com.juzi.lianji.data.AppSettings
-import com.juzi.lianji.ui.liquid.IosLiquidGlassNavigationBar
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.job
@@ -37,6 +37,7 @@ import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.textureBlur
+import top.yukonga.miuix.kmp.blur.highlight.Highlight
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.*
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
@@ -238,15 +239,21 @@ private fun MainNavigationBar(
 ) {
     val page=pagerState.selectedPage
     when(settings.navigationBarStyle) {
-        "FLOATING" -> {
+        "FLOATING", "LIQUID" -> {
+            val liquid=settings.navigationBarStyle=="LIQUID"
             val shape:Shape=RoundedCornerShape(FloatingToolbarDefaults.CornerRadius)
             FloatingNavigationBar(
-                modifier=Modifier.textureBlur(backdrop=backdrop,shape=shape,blurRadius=25f,colors=BlurDefaults.blurColors(blendColors=listOf(BlendColorEntry(MiuixTheme.colorScheme.surfaceContainer.copy(alpha=.6f))))),
+                modifier=Modifier.textureBlur(
+                    backdrop=backdrop,
+                    shape=shape,
+                    blurRadius=if(liquid)35f else 25f,
+                    colors=BlurDefaults.blurColors(blendColors=listOf(BlendColorEntry(MiuixTheme.colorScheme.surfaceContainer.copy(alpha=if(liquid).34f else .6f)))),
+                    highlight=if(liquid){if(MiuixTheme.colorScheme.background.luminance()<.5f)Highlight.GlassStrokeMiddleDark else Highlight.GlassStrokeMiddleLight}else null,
+                ),
                 color=Color.Transparent,
                 horizontalAlignment=when(settings.floatingNavigationBarPosition){"START"->Alignment.Start;"END"->Alignment.End;else->Alignment.CenterHorizontally},
             ) { items.forEachIndexed{i,item->FloatingNavigationBarItem(selected=page==i,onClick={pagerState.animateToPage(i)},icon=item.icon,label=item.label)} }
         }
-        "LIQUID" -> IosLiquidGlassNavigationBar(items,page,{pagerState.animateToPage(it)},backdrop,true)
         else -> Box(Modifier.textureBlur(backdrop=backdrop,shape=RectangleShape,blurRadius=25f,colors=blurColors)) {
             NavigationBar(color=Color.Transparent,mode=when(settings.navigationBarMode){"ICON_ONLY"->NavigationBarDisplayMode.IconOnly;"SELECTED_LABEL"->NavigationBarDisplayMode.IconWithSelectedLabel;else->NavigationBarDisplayMode.IconAndText}) {
                 items.forEachIndexed{i,item->NavigationBarItem(selected=page==i,onClick={pagerState.animateToPage(i)},icon=item.icon,label=item.label)}
