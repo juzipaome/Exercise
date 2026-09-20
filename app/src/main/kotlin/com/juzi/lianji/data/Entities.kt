@@ -114,7 +114,11 @@ data class WorkoutSetEntity(
     val restEndedAt: Long? = null,
     @ColumnInfo(defaultValue = "0") val restDurationSeconds: Int = 0,
     @ColumnInfo(defaultValue = "0.0") val distanceKm: Double = 0.0,
+    val restNotifiedAt: Long? = null,
 )
+
+@Entity(tableName = "imported_backups")
+data class ImportedBackupEntity(@PrimaryKey val fingerprint: String, val importedAt: Long)
 
 object TrackingMode {
     const val STRENGTH = "STRENGTH"
@@ -164,4 +168,5 @@ data class SessionSetRow(
     val restDurationSeconds: Int = 0,
     val trackingMode: String = TrackingMode.STRENGTH,
     val distanceKm: Double = 0.0,
+    val restNotifiedAt: Long? = null,
 )

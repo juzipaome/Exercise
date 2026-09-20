@@ -9,11 +9,20 @@
 ```powershell
 $env:JAVA_HOME='D:\Software\JetBrains\Android Studio\jbr'
 $env:ANDROID_HOME='D:\Software\Android\Sdk'
-.\gradlew.bat testDebugUnitTest assembleDebug
+.\gradlew.bat lintDebug testDebugUnitTest assembleDebug assembleDebugAndroidTest --no-daemon --no-configuration-cache --max-workers=2
 .\tools\validate_exercise_dataset.ps1
 ```
 
 Debug APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。
+
+Compose UI 回归使用临时模拟器运行（先用 `adb devices` 核对序列号，不要对日常使用的手机执行测试安装）：
+
+```powershell
+$env:ANDROID_SERIAL='emulator-5554'
+.\gradlew.bat connectedDebugAndroidTest --no-daemon --no-configuration-cache --max-workers=2
+```
+
+测试 runner 不启动生产 Application 的导入/通知任务；训练数据使用 Room 内存库，设置使用测试 APK 的目录。测试报告位于 `app/build/reports/androidTests/connected/`。CI 编译 UI 测试 APK，但不执行模拟器测试；模拟器通过不等于 Release 真机帧率或 HyperOS 后台验收通过。
 
 ## 技术栈
 
@@ -40,4 +49,4 @@ Debug APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。
 ## 当前状态
 
 四个主 Tab、计划、日程、训练组计时/休息、历史、自定义动作、主题和 JSON 备份已接通；计划编辑和训练中可查看动作详情，已完成记录会自动汇总力量与有氧 PB，并集中显示在动作详情页。
-当前单元测试和 Debug 构建通过；Compose 仪器化测试尚未建立，添加首个测试时再引入对应依赖。
+数据库版本为 6，Room schema 保存在 `app/schemas/`；本地 Robolectric 测试覆盖 5→6 升级、训练事务、备份和休息提醒。Compose 仪器化回归覆盖保存失败后的输入保留与重试、日历切月/日期详情、动作开始后的排序、手动拖动边缘滚动、防误删与卡片位置稳定性；测试依赖只用于 Debug/测试，版本与 MIUIX 实际解析的 Compose 对齐。

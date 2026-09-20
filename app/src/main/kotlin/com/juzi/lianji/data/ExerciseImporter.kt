@@ -1,6 +1,9 @@
 package com.juzi.lianji.data
 
 import android.content.Context
+import androidx.room.withTransaction
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -26,9 +29,15 @@ private data class SourceExercise(
 object ExerciseImporter {
     const val ExpectedCount = 1324
     private val json = Json { ignoreUnknownKeys = true }
+    private val seedMutex = Mutex()
+    private const val DatasetVersion = 2
 
-    suspend fun seedIfNeeded(context: Context, dao: ExerciseDao) = withContext(Dispatchers.IO) {
-        if (dao.builtinCount() == ExpectedCount) return@withContext
+    suspend fun seedIfNeeded(context: Context, db: LianJiDatabase) = withContext(Dispatchers.IO) { seedMutex.withLock {
+        val dao=db.exerciseDao()
+        val preferences=context.getSharedPreferences("dataset_seed",Context.MODE_PRIVATE)
+        val mediaNames=context.assets.list("exercise_dataset/images").orEmpty().sorted()+context.assets.list("exercise_dataset/videos").orEmpty().sorted()
+        val signature="$DatasetVersion:${mediaNames.hashCode()}"
+        if (dao.builtinCount() == ExpectedCount && preferences.getString("signature",null)==signature) return@withLock
         val raw = context.assets.open("exercise_dataset/data/exercises.json").bufferedReader().use { it.readText() }
         val namesRaw = context.assets.open("exercise_dataset/data/names_zh.json").bufferedReader().use { it.readText() }
         val namesZh = json.decodeFromString<Map<String,String>>(namesRaw)
@@ -44,12 +53,16 @@ object ExerciseImporter {
         require(source.size == ExpectedCount) { "动作数据应有 $ExpectedCount 条，实际 ${source.size} 条" }
         require(source.map { it.id }.distinct().size == ExpectedCount) { "动作 ID 不唯一" }
         require(namesZh.size == ExpectedCount) { "中文动作名应有 $ExpectedCount 条，实际 ${namesZh.size} 条" }
-        source.chunked(100).forEach { chunk ->
-            dao.insertBuiltinPreservingUserState(chunk.map {
-                it.toEntity(namesZh[it.id] ?: it.name, availableMedia)
+        db.withTransaction {
+            val existing=dao.getBuiltin().associateBy { it.id }
+            dao.upsertAll(source.map {
+                val item=it.toEntity(namesZh[it.id] ?: it.name,availableMedia)
+                val previous=existing[it.id]
+                item.copy(nameZh=previous?.nameZh?.takeIf{_->previous.nameZh!=previous.datasetNameZh}?:item.nameZh,isFavorite=previous?.isFavorite?:false)
             })
         }
-    }
+        preferences.edit().putString("signature",signature).apply()
+    } }
 
     private fun SourceExercise.toEntity(
         translatedName: String,

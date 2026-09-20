@@ -16,6 +16,7 @@ import coil3.compose.AsyncImage
 import com.juzi.lianji.MainViewModel
 import com.juzi.lianji.data.ExerciseEntity
 import com.juzi.lianji.data.isCardio
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -50,7 +51,9 @@ fun PlanEditorScreen(vm:MainViewModel,planId:Long?=null,onBack:()->Unit,onSave:(
 @Composable
 fun WorkoutExercisePickerScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
-    val rows by vm.repository.rows(sessionId).collectAsStateWithLifecycle(emptyList())
+    val scope=rememberCoroutineScope()
+    var saving by remember{mutableStateOf(false)}
+    val rows by remember(vm,sessionId){vm.repository.rows(sessionId)}.collectAsStateWithLifecycle(emptyList())
     var query by remember { mutableStateOf("") }
     var body by remember { mutableStateOf("") }
     var favoriteOnly by remember { mutableStateOf(false) }
@@ -69,7 +72,11 @@ fun WorkoutExercisePickerScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit)
                         val media=ex.imagePath?:ex.gifPath
                         if(media!=null)AsyncImage("file:///android_asset/$media",null,Modifier.size(64.dp).squircleClip(14.dp),contentScale=ContentScale.Crop) else Spacer(Modifier.size(64.dp))
                         Column(Modifier.weight(1f)){Text(ex.nameZh,style=MiuixTheme.textStyles.title3);Text(bodyPartLabel(ex.bodyPart),color=MiuixTheme.colorScheme.onSurfaceSecondary)}
-                        Button(enabled=!added,onClick={vm.addExercise(sessionId,ex.id);onBack()}){Text(if(added)"已添加" else "添加")}
+                        Button(enabled=!added&&!saving,onClick={
+                            saving=true
+                            val job=vm.addExercise(sessionId,ex.id,onDone=onBack)
+                            scope.launch { try { job.join() } finally { saving=false } }
+                        }){Text(if(added)"已添加" else "添加")}
                     }
                 }
             }

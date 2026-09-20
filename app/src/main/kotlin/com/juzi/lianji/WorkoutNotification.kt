@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -143,6 +144,8 @@ class WorkoutNotificationCoordinator(
     @Volatile private var latest: WorkoutNotificationModel? = null
     private lateinit var scope: CoroutineScope
     private val sequence = AtomicLong(System.currentTimeMillis())
+    private var cachedPicturePath: String? = null
+    private var cachedPicture: Icon? = null
 
     @OptIn(ExperimentalCoroutinesApi::class)
     fun start(scope: CoroutineScope) {
@@ -151,7 +154,7 @@ class WorkoutNotificationCoordinator(
             repository.activeSession.flatMapLatest { session ->
                 if (session == null) flowOf(null)
                 else repository.rows(session.id).map { workoutNotificationModel(session, it) }
-            }.collect { model ->
+            }.distinctUntilChanged().collect { model ->
                 latest = model
                 if (model == null) context.getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
                 else publish(model)
@@ -161,7 +164,7 @@ class WorkoutNotificationCoordinator(
 
     fun refresh() { scope.launch { latest?.let(::publish) } }
 
-    private fun publish(model: WorkoutNotificationModel) {
+    @Synchronized private fun publish(model: WorkoutNotificationModel) {
         if (context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val specs = buildList {
             model.actionSetId?.let { setId ->
@@ -222,13 +225,28 @@ class WorkoutNotificationCoordinator(
         actions.values.forEach(builder::addAction)
         val notification = builder.build()
         if (actions.isNotEmpty()) notification.extras.putBundle("miui.focus.actions", Bundle().apply { actions.forEach(::putParcelable) })
-        val picture = model.picturePath?.let { path ->
-            runCatching { context.assets.open(path).use { BitmapFactory.decodeStream(it) } }.getOrNull()
-        }?.let(::roundedPicture)?.let(Icon::createWithBitmap) ?: Icon.createWithResource(context, R.mipmap.ic_launcher)
+        if (cachedPicture == null || cachedPicturePath != model.picturePath) {
+            cachedPicturePath = model.picturePath
+            cachedPicture = model.picturePath?.let { path -> runCatching {
+                decodeWorkoutPicture { context.assets.open(path) }?.let(Icon::createWithBitmap)
+            }.onFailure { android.util.Log.w("WorkoutNotification","Unable to decode workout picture",it) }.getOrNull() } ?: Icon.createWithResource(context,R.mipmap.ic_launcher)
+        }
+        val picture = cachedPicture!!
         notification.extras.putBundle("miui.focus.pics", Bundle().apply { putParcelable(PICTURE_KEY, picture) })
         notification.extras.putString("miui.focus.param", islandParams(model, actions.keys.toList(), sequence.incrementAndGet()).toString())
         context.getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification)
     }
+}
+
+internal fun decodeWorkoutPicture(open: () -> java.io.InputStream): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    open().use { BitmapFactory.decodeStream(it,null,bounds) }
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    val options = BitmapFactory.Options().apply {
+        inSampleSize = 1 // Options defaults to 0; it cannot be used as a divisor.
+        while (maxOf(bounds.outWidth,bounds.outHeight) / inSampleSize > 192) inSampleSize *= 2
+    }
+    return open().use { BitmapFactory.decodeStream(it,null,options) }?.let(::roundedPicture)
 }
 
 private fun roundedPicture(source: Bitmap): Bitmap = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888).also { result ->
@@ -310,10 +328,7 @@ class WorkoutNotificationReceiver : BroadcastReceiver() {
                 when (intent.action) {
                     ACTION_START_SET -> repository.beginSet(setId)
                     ACTION_PAUSE_SET -> repository.pauseSet(setId)
-                    ACTION_COMPLETE_SET -> repository.rows(sessionId).first().firstOrNull { it.setId == setId }?.let { row ->
-                        if (row.trackingMode == TrackingMode.CARDIO) repository.completeCardio(setId, row.distanceKm)
-                        else repository.completeSet(setId, row.weightKg, row.reps)
-                    }
+                    ACTION_COMPLETE_SET -> repository.completeSavedSet(setId)
                 }
             } finally {
                 result.finish()

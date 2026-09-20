@@ -23,6 +23,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         (application as LianJiApplication).workoutNotifications.refresh()
+        (application as LianJiApplication).restReminder.refresh()
     }
 
     override fun onNewIntent(intent: Intent) {

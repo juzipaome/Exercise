@@ -14,6 +14,14 @@ class WorkoutNotificationTest {
     private val session = WorkoutSessionEntity(7, 1, "训练计划", 1_000, localDate = "2026-08-21")
     private val row = SessionSetRow(11, 3, "深蹲", 0, 90, 0, 20.0, 10, false)
 
+    @Test fun rest_alarm_only_exists_for_unnotified_active_rest() {
+        val rest=row.copy(completed=true,restStartedAt=8_000)
+        assertEquals(RestAlarm(7,11,98_000),pendingRestAlarm(session,listOf(rest)))
+        assertNull(pendingRestAlarm(session,listOf(rest.copy(restNotifiedAt=98_000))))
+        assertNull(pendingRestAlarm(session,listOf(rest.copy(restEndedAt=90_000))))
+        assertNull(pendingRestAlarm(session.copy(status="COMPLETED"),listOf(rest)))
+    }
+
     @Test fun mapsStartRunningPauseAndRest() {
         val waiting = workoutNotificationModel(session, listOf(row), 10_000)
         assertEquals("开始", waiting.actionTitle)

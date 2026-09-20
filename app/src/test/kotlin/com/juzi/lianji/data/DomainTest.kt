@@ -139,9 +139,9 @@ class DomainTest {
 
     @Test fun workout_order_follows_the_exercises_the_user_actually_started() {
         val rows = listOf(
-            workoutRow(1, 10, "计划第一项", exercisePosition=0),
-            workoutRow(2, 20, "先挑着做", exercisePosition=1, startedAt=100),
-            workoutRow(3, 30, "之后挑着做", exercisePosition=2, startedAt=200),
+            workoutRow(1, 10, "计划第一项", exercisePosition=2),
+            workoutRow(2, 20, "先挑着做", exercisePosition=0, startedAt=100),
+            workoutRow(3, 30, "之后挑着做", exercisePosition=1, startedAt=200),
         )
 
         assertEquals(
@@ -153,8 +153,8 @@ class DomainTest {
     @Test fun selected_lower_exercise_reports_its_new_position_after_it_starts() {
         val rows = listOf(
             workoutRow(1, 10, "已开始", exercisePosition=0, startedAt=100),
-            workoutRow(2, 20, "未开始", exercisePosition=1),
-            workoutRow(3, 30, "刚选择", exercisePosition=2, startedAt=200),
+            workoutRow(2, 20, "未开始", exercisePosition=2),
+            workoutRow(3, 30, "刚选择", exercisePosition=1, startedAt=200),
         )
 
         assertEquals(1, startedWorkoutGroupIndex(rows, setId=3))
@@ -191,6 +191,20 @@ class DomainTest {
                 pausedDurationMillis=2_000,
             ),
         )
+    }
+
+    @Test fun first_start_promotes_once_and_manual_order_survives_resume() {
+        assertEquals(listOf(30L,10L,20L),promoteStartedExercise(listOf(10L,20L,30L),emptySet(),30))
+        assertEquals(listOf(10L,30L,20L),promoteStartedExercise(listOf(10L,20L,30L),setOf(10L),30))
+        assertEquals(listOf(20L,10L),promoteStartedExercise(listOf(20L,10L),setOf(10L,20L),10))
+        val rows=listOf(workoutRow(1,10,"A",1,startedAt=100),workoutRow(2,20,"B",0,startedAt=200))
+        assertEquals(listOf("B","A"),orderedWorkoutGroups(rows).map{it.first().exerciseName})
+    }
+
+    @Test fun draft_numbers_reject_invalid_and_non_finite_input() {
+        listOf("-1","NaN","Infinity","1e999","").forEach { assertEquals(null,validWeight(it)) }
+        assertEquals(0.0,validWeight("0")); assertEquals(32.5,validWeight("32.5"))
+        assertEquals(null,validReps("-1")); assertEquals(null,validReps("1.5"))
     }
 
     @Test fun resumed_activity_excludes_all_previous_pauses() {

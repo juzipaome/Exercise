@@ -38,6 +38,7 @@ fun MiuixPageScaffold(
     bottomBar: @Composable () -> Unit = {},
     floatingToolbar: @Composable () -> Unit = {},
     floatingToolbarPosition: ToolbarPosition = ToolbarPosition.BottomCenter,
+    titleProvider: (() -> String)? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val surfaceColor = MiuixTheme.colorScheme.surface
@@ -68,7 +69,7 @@ fun MiuixPageScaffold(
                 },
             ) {
                 SmallTopAppBar(
-                    title = title,
+                    title = titleProvider?.invoke() ?: title,
                     color = barColor,
                     navigationIcon = navigationIcon,
                     actions = actions,

@@ -45,6 +45,8 @@ import top.yukonga.miuix.kmp.nav.core.NavKey
 import top.yukonga.miuix.kmp.nav.core.rememberNavBackStack
 import top.yukonga.miuix.kmp.nav.core.rememberNavSystemCornerRadius
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.LocalDismissState
+import top.yukonga.miuix.kmp.window.WindowDialog
 import java.time.YearMonth
 import kotlin.math.abs
 
@@ -102,6 +104,11 @@ fun LianJiApp(vm: MainViewModel, requestedWorkoutId: Long? = null, onWorkoutOpen
         AppScreen.About -> AboutScreen(::animatedPop)
     } }
     LianJiTheme(state.settings) {
+        val operationError by vm.operationError.collectAsStateWithLifecycle()
+        WindowDialog(show=operationError!=null,title="操作未完成",summary=operationError,onDismissRequest=vm::dismissOperationError) {
+            val dismiss=LocalDismissState.current
+            TextButton("知道了",onClick={dismiss?.invoke()},modifier=Modifier.fillMaxWidth())
+        }
         val navCornerRadius = rememberNavSystemCornerRadius()
         val navBackdropColor = MiuixTheme.colorScheme.surface
         val navEffects = remember(navCornerRadius, navBackdropColor) {
@@ -150,7 +157,6 @@ private fun MainTabs(vm:MainViewModel,selectedPage:Int,onSelectedPage:(Int)->Uni
     // Each page receives only the fields it renders. Loading the exercise library and
     // history after startup must not invalidate and recompose the already visible home.
     val homeState=remember(state.plans,state.active,state.settings){MainUiState(isReady=true,plans=state.plans,active=state.active,settings=state.settings)}
-    val calendarState=remember(state.schedules,state.sessions,state.days){MainUiState(isReady=true,schedules=state.schedules,sessions=state.sessions,days=state.days)}
     val exerciseState=remember(state.exercises){MainUiState(isReady=true,exercises=state.exercises)}
     val settingsState=remember(state.settings){MainUiState(isReady=true,settings=state.settings)}
     val labels=listOf("运动","日历","动作库","设置")
@@ -217,7 +223,7 @@ private fun MainTabs(vm:MainViewModel,selectedPage:Int,onSelectedPage:(Int)->Uni
                     HorizontalPager(state=pager,modifier=Modifier.fillMaxSize(),verticalAlignment=androidx.compose.ui.Alignment.Top) { page ->
                         when(page) {
                             0 -> WorkoutHomeScreen(homeState,padding,listStates[0],scrollBehaviors[0],onEdit={onNavigate(AppScreen.EditPlan(it))},onStart={vm.start(it){id->onNavigate(AppScreen.Workout(id))}},onContinue={homeState.active?.let{onNavigate(AppScreen.Workout(it.id))}},onDuplicate=vm::duplicatePlan,onDelete=vm::deletePlan)
-                            1 -> CalendarScreen(calendarState,padding,listStates[1],scrollBehaviors[1],onDay={onNavigate(AppScreen.Day(it))},onMonth={onNavigate(AppScreen.MonthAnalytics(it.toString()))})
+                            1 -> CalendarScreen(vm,padding,listStates[1],scrollBehaviors[1],onDay={onNavigate(AppScreen.Day(it))},onMonth={onNavigate(AppScreen.MonthAnalytics(it.toString()))})
                             2 -> ExerciseLibraryScreen(exerciseState,padding,listStates[2],scrollBehaviors[2],{onNavigate(AppScreen.ExerciseDetail(it))},vm::toggleFavorite)
                             else -> SettingsScreen(settingsState,padding,listStates[3],scrollBehaviors[3],vm,snackbarHostState,onAbout={onNavigate(AppScreen.About)})
                         }

@@ -16,20 +16,24 @@ fun <T> movedItem(items:List<T>,from:Int,to:Int):List<T> =
     else items.toMutableList().apply{add(to,removeAt(from))}
 
 /**
- * Keeps exercises that have actually been started in the order the user first
- * touched them. Exercises that have not been started yet retain their plan order.
+ * Persisted order is shared by UI, notifications and plan export. Automatic
+ * promotion happens once in beginSet's transaction, not on every render.
  */
 fun orderedWorkoutGroups(rows: List<SessionSetRow>): List<List<SessionSetRow>> =
     rows.groupBy { it.sessionExerciseId }
         .values
         .map { it.sortedBy(SessionSetRow::setPosition) }
-        .sortedWith(
-            compareBy<List<SessionSetRow>>(
-                { group -> group.mapNotNull { it.startedAt ?: it.completedAt }.minOrNull() == null },
-                { group -> group.mapNotNull { it.startedAt ?: it.completedAt }.minOrNull() ?: Long.MAX_VALUE },
-                { group -> group.first().exercisePosition },
-            ),
-        )
+        .sortedBy { it.first().exercisePosition }
+
+fun promoteStartedExercise(order: List<Long>, startedIds: Set<Long>, selectedId: Long): List<Long> {
+    if (selectedId in startedIds || selectedId !in order) return order
+    val remaining = order.filterNot { it == selectedId }.toMutableList()
+    remaining.add(remaining.indexOfLast { it in startedIds } + 1, selectedId)
+    return remaining
+}
+
+fun validWeight(value: String): Double? = value.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0 }
+fun validReps(value: String): Int? = value.toIntOrNull()?.takeIf { it >= 0 }
 
 fun startedWorkoutGroupIndex(rows: List<SessionSetRow>, setId: Long): Int? {
     val exerciseId = rows.firstOrNull { it.setId == setId && it.startedAt != null }?.sessionExerciseId ?: return null

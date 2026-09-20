@@ -52,4 +52,10 @@ class SettingsStore(private val context: Context) {
     suspend fun setNavigationBarStyle(value: String) = context.dataStore.edit { it[Keys.navigationBarStyle] = value }
     suspend fun setNavigationBarMode(value: String) = context.dataStore.edit { it[Keys.navigationBarMode] = value }
     suspend fun setFloatingNavigationBarPosition(value: String) = context.dataStore.edit { it[Keys.floatingNavigationBarPosition] = value }
+    suspend fun restore(value: AppSettings) = context.dataStore.edit {
+        it[Keys.theme]=value.themeMode; it[Keys.dynamic]=value.dynamicColor
+        it[Keys.rest]=value.defaultRestSeconds; it[Keys.vibration]=value.vibration; it[Keys.sound]=value.sound
+        it[Keys.navigationBarStyle]=value.navigationBarStyle; it[Keys.navigationBarMode]=value.navigationBarMode
+        it[Keys.floatingNavigationBarPosition]=value.floatingNavigationBarPosition
+    }
 }

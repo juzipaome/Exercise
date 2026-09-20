@@ -1,0 +1,637 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 6,
+    "identityHash": "5bfea596f9a96f8f1151fee8a4c53b88",
+    "entities": [
+      {
+        "tableName": "exercises",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `nameEn` TEXT NOT NULL, `nameZh` TEXT NOT NULL, `bodyPart` TEXT NOT NULL, `equipment` TEXT NOT NULL, `target` TEXT NOT NULL, `muscleGroup` TEXT NOT NULL, `secondaryMuscles` TEXT NOT NULL, `instructionsZh` TEXT NOT NULL, `instructionsEn` TEXT NOT NULL, `imagePath` TEXT, `gifPath` TEXT, `attribution` TEXT NOT NULL, `datasetNameZh` TEXT NOT NULL DEFAULT '', `trackingMode` TEXT NOT NULL DEFAULT 'STRENGTH', `isCustom` INTEGER NOT NULL, `isFavorite` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameEn",
+            "columnName": "nameEn",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameZh",
+            "columnName": "nameZh",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bodyPart",
+            "columnName": "bodyPart",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "equipment",
+            "columnName": "equipment",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "target",
+            "columnName": "target",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "muscleGroup",
+            "columnName": "muscleGroup",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "secondaryMuscles",
+            "columnName": "secondaryMuscles",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "instructionsZh",
+            "columnName": "instructionsZh",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "instructionsEn",
+            "columnName": "instructionsEn",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "imagePath",
+            "columnName": "imagePath",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "gifPath",
+            "columnName": "gifPath",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "attribution",
+            "columnName": "attribution",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "datasetNameZh",
+            "columnName": "datasetNameZh",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "trackingMode",
+            "columnName": "trackingMode",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'STRENGTH'"
+          },
+          {
+            "fieldPath": "isCustom",
+            "columnName": "isCustom",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isFavorite",
+            "columnName": "isFavorite",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "workout_plans",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `note` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "plan_exercises",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `planId` INTEGER NOT NULL, `exerciseId` TEXT NOT NULL, `position` INTEGER NOT NULL, `defaultSets` INTEGER NOT NULL, `defaultReps` INTEGER NOT NULL, `defaultWeightKg` REAL NOT NULL, `restSeconds` INTEGER NOT NULL, FOREIGN KEY(`planId`) REFERENCES `workout_plans`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`exerciseId`) REFERENCES `exercises`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "planId",
+            "columnName": "planId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "exerciseId",
+            "columnName": "exerciseId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "defaultSets",
+            "columnName": "defaultSets",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "defaultReps",
+            "columnName": "defaultReps",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "defaultWeightKg",
+            "columnName": "defaultWeightKg",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "restSeconds",
+            "columnName": "restSeconds",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_plan_exercises_planId",
+            "unique": false,
+            "columnNames": [
+              "planId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_plan_exercises_planId` ON `${TABLE_NAME}` (`planId`)"
+          },
+          {
+            "name": "index_plan_exercises_exerciseId",
+            "unique": false,
+            "columnNames": [
+              "exerciseId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_plan_exercises_exerciseId` ON `${TABLE_NAME}` (`exerciseId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "workout_plans",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "planId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "exercises",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "exerciseId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "scheduled_workouts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `planId` INTEGER, `planName` TEXT NOT NULL, `scheduledDate` TEXT NOT NULL, `status` TEXT NOT NULL, FOREIGN KEY(`planId`) REFERENCES `workout_plans`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "planId",
+            "columnName": "planId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "planName",
+            "columnName": "planName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scheduledDate",
+            "columnName": "scheduledDate",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_scheduled_workouts_planId",
+            "unique": false,
+            "columnNames": [
+              "planId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_scheduled_workouts_planId` ON `${TABLE_NAME}` (`planId`)"
+          },
+          {
+            "name": "index_scheduled_workouts_scheduledDate",
+            "unique": false,
+            "columnNames": [
+              "scheduledDate"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_scheduled_workouts_scheduledDate` ON `${TABLE_NAME}` (`scheduledDate`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "workout_plans",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "planId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "workout_sessions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sourcePlanId` INTEGER, `planNameSnapshot` TEXT NOT NULL, `startedAt` INTEGER NOT NULL, `endedAt` INTEGER, `localDate` TEXT NOT NULL, `status` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourcePlanId",
+            "columnName": "sourcePlanId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "planNameSnapshot",
+            "columnName": "planNameSnapshot",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAt",
+            "columnName": "startedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endedAt",
+            "columnName": "endedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "localDate",
+            "columnName": "localDate",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_workout_sessions_localDate",
+            "unique": false,
+            "columnNames": [
+              "localDate"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_workout_sessions_localDate` ON `${TABLE_NAME}` (`localDate`)"
+          }
+        ]
+      },
+      {
+        "tableName": "session_exercises",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sessionId` INTEGER NOT NULL, `exerciseId` TEXT NOT NULL, `exerciseNameSnapshot` TEXT NOT NULL, `position` INTEGER NOT NULL, `restSeconds` INTEGER NOT NULL, `trackingMode` TEXT NOT NULL DEFAULT 'STRENGTH', FOREIGN KEY(`sessionId`) REFERENCES `workout_sessions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "exerciseId",
+            "columnName": "exerciseId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "exerciseNameSnapshot",
+            "columnName": "exerciseNameSnapshot",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "restSeconds",
+            "columnName": "restSeconds",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "trackingMode",
+            "columnName": "trackingMode",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'STRENGTH'"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_session_exercises_sessionId",
+            "unique": false,
+            "columnNames": [
+              "sessionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_session_exercises_sessionId` ON `${TABLE_NAME}` (`sessionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "workout_sessions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sessionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "workout_sets",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sessionExerciseId` INTEGER NOT NULL, `position` INTEGER NOT NULL, `weightKg` REAL NOT NULL, `reps` INTEGER NOT NULL, `completed` INTEGER NOT NULL, `startedAt` INTEGER, `completedAt` INTEGER, `durationSeconds` INTEGER NOT NULL DEFAULT 0, `pausedAt` INTEGER, `pausedDurationMillis` INTEGER NOT NULL DEFAULT 0, `restStartedAt` INTEGER, `restEndedAt` INTEGER, `restDurationSeconds` INTEGER NOT NULL DEFAULT 0, `distanceKm` REAL NOT NULL DEFAULT 0.0, `restNotifiedAt` INTEGER, FOREIGN KEY(`sessionExerciseId`) REFERENCES `session_exercises`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionExerciseId",
+            "columnName": "sessionExerciseId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "weightKg",
+            "columnName": "weightKg",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reps",
+            "columnName": "reps",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "completed",
+            "columnName": "completed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAt",
+            "columnName": "startedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "completedAt",
+            "columnName": "completedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "durationSeconds",
+            "columnName": "durationSeconds",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "pausedAt",
+            "columnName": "pausedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "pausedDurationMillis",
+            "columnName": "pausedDurationMillis",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "restStartedAt",
+            "columnName": "restStartedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "restEndedAt",
+            "columnName": "restEndedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "restDurationSeconds",
+            "columnName": "restDurationSeconds",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "distanceKm",
+            "columnName": "distanceKm",
+            "affinity": "REAL",
+            "notNull": true,
+            "defaultValue": "0.0"
+          },
+          {
+            "fieldPath": "restNotifiedAt",
+            "columnName": "restNotifiedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_workout_sets_sessionExerciseId",
+            "unique": false,
+            "columnNames": [
+              "sessionExerciseId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_workout_sets_sessionExerciseId` ON `${TABLE_NAME}` (`sessionExerciseId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "session_exercises",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sessionExerciseId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "imported_backups",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`fingerprint` TEXT NOT NULL, `importedAt` INTEGER NOT NULL, PRIMARY KEY(`fingerprint`))",
+        "fields": [
+          {
+            "fieldPath": "fingerprint",
+            "columnName": "fingerprint",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "importedAt",
+            "columnName": "importedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "fingerprint"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '5bfea596f9a96f8f1151fee8a4c53b88')"
+    ]
+  }
+}

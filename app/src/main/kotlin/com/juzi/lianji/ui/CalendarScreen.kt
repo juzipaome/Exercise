@@ -16,7 +16,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.juzi.lianji.MainUiState
 import com.juzi.lianji.MainViewModel
 import com.juzi.lianji.data.*
 import top.yukonga.miuix.kmp.basic.*
@@ -40,10 +39,14 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
-@Composable fun CalendarScreen(state:MainUiState,padding:PaddingValues,listState:LazyListState,scrollBehavior:ScrollBehavior,onDay:(String)->Unit,onMonth:(YearMonth)->Unit){
-    var monthValue by rememberSaveable{mutableStateOf(YearMonth.now().toString())};val month=YearMonth.parse(monthValue);val offset=month.atDay(1).dayOfWeek.value-1;val summaries=state.days.groupBy{it.localDate};val prefix=month.toString()
-    val completed=state.sessions.filter{it.localDate.startsWith(prefix)&&it.status=="COMPLETED"};val trainingDays=completed.map{it.localDate}.distinct().size;val seconds=completed.sumOf{((it.endedAt?:it.startedAt)-it.startedAt).coerceAtLeast(0)}/1000
+@Composable fun CalendarScreen(vm:MainViewModel,padding:PaddingValues,listState:LazyListState,scrollBehavior:ScrollBehavior,onDay:(String)->Unit,onMonth:(YearMonth)->Unit){
+    var monthValue by rememberSaveable{mutableStateOf(YearMonth.now().toString())};val month=YearMonth.parse(monthValue);val offset=month.atDay(1).dayOfWeek.value-1
+    val days by remember(vm,month){vm.repository.days(month.atDay(1).toString(),month.plusMonths(1).atDay(1).toString())}.collectAsStateWithLifecycle(emptyList())
+    val sessions by remember(vm,month){vm.repository.sessions(month.atDay(1).toString(),month.plusMonths(1).atDay(1).toString())}.collectAsStateWithLifecycle(emptyList())
+    val summaries=remember(days){days.groupBy{it.localDate}}
+    val completed=sessions.filter{it.localDate.startsWith(month.toString())&&it.status=="COMPLETED"};val trainingDays=completed.map{it.localDate}.distinct().size;val seconds=completed.sumOf{((it.endedAt?:it.startedAt)-it.startedAt).coerceAtLeast(0)}/1000
     LazyColumn(Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),state=listState,contentPadding=PaddingValues(top=padding.calculateTopPadding()+12.dp,bottom=padding.calculateBottomPadding()+24.dp)){
         item{Card(modifier=Modifier.fillMaxWidth().cardPadding(),pressFeedbackType=PressFeedbackType.Sink,onClick={onMonth(month)}){Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("本月概览",style=MiuixTheme.textStyles.title2);Text("${month.format(DateTimeFormatter.ofPattern("yyyy年 M月"))} · 点击查看详细分析",color=MiuixTheme.colorScheme.onSurfaceSecondary)};Icon(MiuixIcons.ChevronForward,"查看月度分析")};Row(Modifier.fillMaxWidth()){MonthStat(trainingDays.toString(),"训练日",Modifier.weight(1f));MonthStat(completed.size.toString(),"训练次数",Modifier.weight(1f));MonthStat(formatLongDuration(seconds),"总时长",Modifier.weight(1f))}}}}
         item{Card(Modifier.cardPadding()){Column(Modifier.padding(horizontal=4.dp,vertical=12.dp)){
@@ -125,6 +128,8 @@ import kotlin.math.roundToInt
 @Composable
 fun DayDetailScreen(vm:MainViewModel,date:String,onBack:()->Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val scope=rememberCoroutineScope()
+    var saving by remember{mutableStateOf(false)}
     var showAddPast by remember{mutableStateOf(false)}
     var selectedPlanId by remember{mutableStateOf<Long?>(null)}
     var candidatePlanId by remember{mutableStateOf<Long?>(null)}
@@ -135,8 +140,9 @@ fun DayDetailScreen(vm:MainViewModel,date:String,onBack:()->Unit) {
     var endTime by remember{mutableStateOf("19:00")}
     var cardioDistances by remember{mutableStateOf<Map<String,String>>(emptyMap())}
     var cardioDurations by remember{mutableStateOf<Map<String,String>>(emptyMap())}
-    val sessions=state.sessions.filter{it.localDate==date&&it.status!="DISCARDED"}
-    val schedules=state.schedules.filter{it.scheduledDate==date}
+    val untilDate=remember(date){LocalDate.parse(date).plusDays(1).toString()}
+    val sessions by remember(vm,date){vm.repository.sessions(date,untilDate)}.collectAsStateWithLifecycle(emptyList())
+    val schedules by remember(vm,date){vm.repository.schedules(date,untilDate)}.collectAsStateWithLifecycle(emptyList())
     MiuixPageScaffold(title=date,navigationIcon={BackButton(onBack)},actions={if(!LocalDate.parse(date).isAfter(LocalDate.now()))IconButton(onClick={showAddPast=true}){Icon(MiuixIcons.Add,"补录过去训练")}}) { pad ->
         LazyColumn(contentPadding=PaddingValues(top=pad.calculateTopPadding()+12.dp,bottom=24.dp)) {
             if(sessions.isEmpty()&&schedules.isEmpty()) item{EmptyCard("这天没有训练","可以在计划中安排训练")}
@@ -211,14 +217,18 @@ fun DayDetailScreen(vm:MainViewModel,date:String,onBack:()->Unit) {
             Text(if(validTime)"训练总时长：${formatLongDuration(totalDurationSeconds.toLong())}" else "请输入同一天内有效的开始与结束时间",color=if(validTime)MiuixTheme.colorScheme.onSurfaceSecondary else MiuixTheme.colorScheme.error)
             if(!validDistances)Text("距离应为不小于 0 的数字",color=MiuixTheme.colorScheme.error)
             if(!validDurations)Text(if(selectedCardioIds.size>1)"请分别填写有氧时长，合计不能超过训练总时长" else "有氧时长应大于 0 且不超过训练总时长",color=MiuixTheme.colorScheme.error)
-            Button(enabled=selectedExerciseIds.isNotEmpty()&&validTime&&validDistances&&validDurations,onClick={vm.addPastWorkout(selectedPlanId!!,planExerciseIds.filter{it in selectedExerciseIds},LocalDate.parse(date),startMinute!!,endMinute!!,selectedCardioIds.associateWith{id->cardioDistances[id]?.toDoubleOrNull()?:0.0},effectiveCardioDurations);showAddPast=false;selectedPlanId=null},colors=ButtonDefaults.buttonColorsPrimary(),modifier=Modifier.fillMaxWidth()){Text("补录 ${selectedExerciseIds.size} 个动作")}
+            Button(enabled=!saving&&selectedExerciseIds.isNotEmpty()&&validTime&&validDistances&&validDurations,onClick={
+                saving=true
+                val job=vm.addPastWorkout(selectedPlanId!!,planExerciseIds.filter{it in selectedExerciseIds},LocalDate.parse(date),startMinute!!,endMinute!!,selectedCardioIds.associateWith{id->cardioDistances[id]?.toDoubleOrNull()?:0.0},effectiveCardioDurations,onDone={showAddPast=false;selectedPlanId=null})
+                scope.launch { try { job.join() } finally { saving=false } }
+            },colors=ButtonDefaults.buttonColorsPrimary(),modifier=Modifier.fillMaxWidth()){Text(if(saving)"正在保存…" else "补录 ${selectedExerciseIds.size} 个动作")}
         }
     }
 }
 
 @Composable
 private fun SessionHistoryCard(vm:MainViewModel,session:WorkoutSessionEntity) {
-    val rows by vm.repository.rows(session.id).collectAsStateWithLifecycle(emptyList())
+    val rows by remember(vm,session.id){vm.repository.rows(session.id)}.collectAsStateWithLifecycle(emptyList())
     var expanded by rememberSaveable(session.id){mutableStateOf(false)}
     var confirm by remember{mutableStateOf(false)}
     val groups=rows.filter{it.completed}.groupBy{it.sessionExerciseId}.values
@@ -227,7 +237,7 @@ private fun SessionHistoryCard(vm:MainViewModel,session:WorkoutSessionEntity) {
         Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Surface(onClick={expanded=!expanded},modifier=Modifier.fillMaxWidth().padding(vertical=4.dp).squircleClip(14.dp),color=Color.Transparent,shadowElevation=0.dp) {
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)){Text(session.planNameSnapshot,style=MiuixTheme.textStyles.title2);Text("${if(session.status=="COMPLETED")"已完成" else "进行中"} · ${groups.size} 个动作 · ${formatDuration(seconds)}",color=MiuixTheme.colorScheme.onSurfaceSecondary)}
+                Column(Modifier.weight(1f)){Text(session.planNameSnapshot,style=MiuixTheme.textStyles.title2);Text("${when(session.status){"COMPLETED"->"已完成";"INTERRUPTED"->"已中断";else->"进行中"}} · ${groups.size} 个动作 · ${formatDuration(seconds)}",color=MiuixTheme.colorScheme.onSurfaceSecondary)}
                 IconButton(onClick={expanded=!expanded}){Icon(if(expanded)MiuixIcons.ExpandLess else MiuixIcons.ExpandMore,if(expanded)"收起详情" else "展开详情")}
                 }
             }
@@ -256,10 +266,10 @@ private fun DeleteConfirm(show:Boolean,title:String,message:String,onCancel:()->
 
 @Composable
 fun MonthAnalyticsScreen(vm:MainViewModel,month:YearMonth,onBack:()->Unit) {
-    val state by vm.state.collectAsStateWithLifecycle()
-    val statsFlow=remember(month){vm.repository.monthlyExerciseStats("$month%")}
+    val statsFlow=remember(vm,month){vm.repository.monthlyExerciseStats("$month%")}
     val exerciseStats by statsFlow.collectAsStateWithLifecycle(emptyList())
-    val sessions=state.sessions.filter{it.status=="COMPLETED"&&it.localDate.startsWith(month.toString())}
+    val monthSessions by remember(vm,month){vm.repository.sessions(month.atDay(1).toString(),month.plusMonths(1).atDay(1).toString())}.collectAsStateWithLifecycle(emptyList())
+    val sessions=monthSessions.filter{it.status=="COMPLETED"&&it.localDate.startsWith(month.toString())}
     val totalSeconds=sessions.sumOf{((it.endedAt?:it.startedAt)-it.startedAt).coerceAtLeast(0)}/1000
     val averageSeconds=if(sessions.isEmpty())0 else totalSeconds/sessions.size
     val totalSets=exerciseStats.filter{it.trackingMode!=TrackingMode.CARDIO}.sumOf{it.completedSets}

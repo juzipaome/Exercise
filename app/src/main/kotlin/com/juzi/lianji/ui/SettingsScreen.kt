@@ -1,5 +1,11 @@
 package com.juzi.lianji.ui
 
+import android.app.AlarmManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.compose.ui.platform.LocalContext
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -21,7 +27,14 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.*
 
 @Composable
-fun SettingsScreen(state:MainUiState,padding:PaddingValues,listState:LazyListState,scrollBehavior:ScrollBehavior,vm:MainViewModel,snackbarHostState:SnackbarHostState,onAbout:()->Unit){val scope=rememberCoroutineScope();val themeModes=listOf("SYSTEM","LIGHT","DARK");val themeOptions=listOf("跟随系统","浅色主题","深色主题");val navigationStyles=listOf("STANDARD","FLOATING","LIQUID");val navigationStyleOptions=listOf("标准底栏","悬浮底栏","液态玻璃");val navigationModes=listOf("ICON_AND_TEXT","ICON_ONLY","SELECTED_LABEL");val navigationModeOptions=listOf("图标和文字","仅图标","仅选中项显示文字");val floatingPositions=listOf("CENTER","START","END");val floatingPositionOptions=listOf("居中","靠左","靠右");val restOptions=listOf(30,60,90,120,180);val export=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->uri?.let{scope.launch{runCatching{vm.backupManager.exportTo(it)}.onSuccess{snackbarHostState.showSnackbar("备份已导出")}.onFailure{snackbarHostState.showSnackbar("导出失败：${it.message}")}}}};val import=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->uri?.let{scope.launch{runCatching{vm.backupManager.importFrom(it)}.onSuccess{snackbarHostState.showSnackbar("恢复完成")}.onFailure{snackbarHostState.showSnackbar("恢复失败，原数据未修改：${it.message}")}}}}
+fun SettingsScreen(state:MainUiState,padding:PaddingValues,listState:LazyListState,scrollBehavior:ScrollBehavior,vm:MainViewModel,snackbarHostState:SnackbarHostState,onAbout:()->Unit){val scope=rememberCoroutineScope();val themeModes=listOf("SYSTEM","LIGHT","DARK");val themeOptions=listOf("跟随系统","浅色主题","深色主题");val navigationStyles=listOf("STANDARD","FLOATING","LIQUID");val navigationStyleOptions=listOf("标准底栏","悬浮底栏","液态玻璃");val navigationModes=listOf("ICON_AND_TEXT","ICON_ONLY","SELECTED_LABEL");val navigationModeOptions=listOf("图标和文字","仅图标","仅选中项显示文字");val floatingPositions=listOf("CENTER","START","END");val floatingPositionOptions=listOf("居中","靠左","靠右");val restOptions=listOf(30,60,90,120,180);val export=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->uri?.let{scope.launch{runCatching{vm.backupManager.exportTo(it)}.onSuccess{snackbarHostState.showSnackbar("备份已导出")}.onFailure{snackbarHostState.showSnackbar("导出失败：${it.message}")}}}};val import=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->uri?.let{scope.launch{runCatching{vm.backupManager.importFrom(it)}.onSuccess{message->snackbarHostState.showSnackbar(message)}.onFailure{snackbarHostState.showSnackbar("恢复失败：${it.message}")}}}}
+    val context=LocalContext.current
+    val alarmManager=context.getSystemService(AlarmManager::class.java)
+    var exactAlarms by remember{mutableStateOf(alarmManager.canScheduleExactAlarms())}
+    val alarmPermission=rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()){
+        exactAlarms=alarmManager.canScheduleExactAlarms()
+        (context.applicationContext as com.juzi.lianji.LianJiApplication).restReminder.refresh()
+    }
     LazyColumn(Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),state=listState,contentPadding=PaddingValues(top=padding.calculateTopPadding()+12.dp,bottom=padding.calculateBottomPadding()+24.dp)){
         item{SmallTitle("外观")}
         item{Card(Modifier.cardPadding()){Column{OverlayDropdownPreference(items=themeOptions,selectedIndex=themeModes.indexOf(state.settings.themeMode).coerceAtLeast(0),title="主题模式",startAction={Icon(MiuixIcons.Theme,null)},onSelectedIndexChange={scope.launch{vm.settingsStore.setTheme(themeModes[it])}});SwitchPreference(checked=state.settings.dynamicColor,onCheckedChange={scope.launch{vm.settingsStore.setDynamic(it)}},title="Monet 动态色",summary="跟随系统壁纸生成应用强调色")}}}
@@ -33,8 +46,9 @@ fun SettingsScreen(state:MainUiState,padding:PaddingValues,listState:LazyListSta
         }}}
         item{SmallTitle("训练提醒")}
         item{Card(Modifier.cardPadding()){Column{OverlayDropdownPreference(items=restOptions.map(::formatRestLabel),selectedIndex=restOptions.indexOf(state.settings.defaultRestSeconds).coerceAtLeast(0),title="默认组间休息",startAction={Icon(MiuixIcons.Timer,null)},onSelectedIndexChange={scope.launch{vm.settingsStore.setRest(restOptions[it])}});SwitchPreference(checked=state.settings.vibration,onCheckedChange={scope.launch{vm.settingsStore.setVibration(it)}},title="震动提醒",summary="休息结束时振动提示");SwitchPreference(checked=state.settings.sound,onCheckedChange={scope.launch{vm.settingsStore.setSound(it)}},title="提示音",summary="休息结束时播放提示音")}}}
+        item{Card(Modifier.cardPadding()){ArrowPreference(title="准时休息提醒",summary=if(exactAlarms)"已允许；可在离开应用后按时提醒" else "未允许精确闹钟，后台提醒可能延迟；点击设置",onClick={alarmPermission.launch(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,Uri.parse("package:${context.packageName}")))})}}
         item{SmallTitle("数据")}
-        item{Card(Modifier.cardPadding()){Column{ArrowPreference(title="导出备份",summary="将计划、日程与历史导出为 JSON",startAction={Icon(MiuixIcons.UploadCloud,null)},onClick={export.launch("练迹备份.json")});ArrowPreference(title="恢复备份",summary="恢复前会校验文件，不覆盖损坏数据",startAction={Icon(MiuixIcons.Import,null)},onClick={import.launch(arrayOf("application/json"))})}}}
+        item{Card(Modifier.cardPadding()){Column{ArrowPreference(title="导出备份",summary="导出计划、日程、历史、收藏和设置",startAction={Icon(MiuixIcons.UploadCloud,null)},onClick={export.launch("练迹备份.json")});ArrowPreference(title="恢复备份",summary="合并导入，同一备份不重复添加；未完成训练保留为中断历史",startAction={Icon(MiuixIcons.Import,null)},onClick={import.launch(arrayOf("application/json"))})}}}
         item{SmallTitle("应用")}
         item{Card(Modifier.cardPadding()){ArrowPreference(title="关于练迹",summary="版本、数据来源、媒体授权与开源许可",startAction={Icon(MiuixIcons.Info,null)},onClick=onAbout)}}
     }

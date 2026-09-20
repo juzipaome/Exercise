@@ -39,10 +39,10 @@ jobs:
         shell: pwsh
         run: sdkmanager "platforms;android-37.0" "build-tools;37.0.0"
 
-      - name: Run unit tests and build Debug APK
+      - name: Run lint, unit tests and build app and UI test APKs
         shell: pwsh
         run: >
-          .\gradlew.bat testDebugUnitTest assembleDebug
+          .\gradlew.bat lintDebug testDebugUnitTest assembleDebug assembleDebugAndroidTest
           --no-daemon
           --no-configuration-cache
           --max-workers=2

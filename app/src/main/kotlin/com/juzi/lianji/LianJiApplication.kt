@@ -12,17 +12,19 @@ class LianJiApplication : Application() {
     lateinit var settingsStore: SettingsStore
     lateinit var backupManager: BackupManager
     lateinit var workoutNotifications: WorkoutNotificationCoordinator
+    lateinit var restReminder: RestReminder
 
     override fun onCreate() {
         super.onCreate()
         database = LianJiDatabase.create(this)
         repository = LianJiRepository(database)
         settingsStore = SettingsStore(this)
-        backupManager = BackupManager(this, database)
+        backupManager = BackupManager(this, database, settingsStore)
         getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("rest_timer", "休息计时", NotificationManager.IMPORTANCE_HIGH))
         getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("workout_timer", "训练进度", NotificationManager.IMPORTANCE_LOW))
         val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        restReminder = RestReminder(this,database,settingsStore).also { it.start(applicationScope) }
         workoutNotifications = WorkoutNotificationCoordinator(this, repository).also { it.start(applicationScope) }
-        applicationScope.launch { ExerciseImporter.seedIfNeeded(this@LianJiApplication, database.exerciseDao()) }
+        applicationScope.launch { ExerciseImporter.seedIfNeeded(this@LianJiApplication, database) }
     }
 }

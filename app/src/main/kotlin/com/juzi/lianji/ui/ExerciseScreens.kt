@@ -19,6 +19,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.juzi.lianji.*
 import com.juzi.lianji.data.TrackingMode
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.LocalDismissState
@@ -55,7 +57,9 @@ fun ExerciseLibraryScreen(state:MainUiState,padding:PaddingValues,listState:Lazy
 
 @Composable
 fun ExerciseDetailScreen(vm:MainViewModel,id:String,onBack:()->Unit){
-    val ex by vm.repository.exercise(id).collectAsStateWithLifecycle(null);val state by vm.state.collectAsStateWithLifecycle();var showRename by remember{mutableStateOf(false)}
+    val ex by remember(vm,id){vm.repository.exercise(id)}.collectAsStateWithLifecycle(null)
+    val personalBest by remember(vm,id){vm.repository.personalBest(id)}.collectAsStateWithLifecycle(null)
+    var showRename by remember{mutableStateOf(false)}
     MiuixPageScaffold(title="动作详情",navigationIcon={BackButton(onBack)}){pad->
         LazyColumn(contentPadding=PaddingValues(top=pad.calculateTopPadding()+12.dp,bottom=24.dp)){ex?.let{e->
             item{Card(Modifier.cardPadding()){Column{
@@ -68,7 +72,7 @@ fun ExerciseDetailScreen(vm:MainViewModel,id:String,onBack:()->Unit){
             }}}
             item{Card(Modifier.cardPadding()){Row(Modifier.fillMaxWidth().padding(18.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)){
                 Surface(modifier=Modifier.size(52.dp).squircleSurface(MiuixTheme.colorScheme.primary.copy(alpha=0.12f),16.dp),color=androidx.compose.ui.graphics.Color.Transparent,shadowElevation=0.dp){Box(contentAlignment=Alignment.Center){Text("🏆",style=MiuixTheme.textStyles.title1)}}
-                Column(Modifier.weight(1f)){Text("个人最佳",style=MiuixTheme.textStyles.title2);Text(personalBestLabel(state.personalBests[e.id]).removePrefix("PB · "),color=MiuixTheme.colorScheme.primary)}
+                Column(Modifier.weight(1f)){Text("个人最佳",style=MiuixTheme.textStyles.title2);Text(personalBestLabel(personalBest).removePrefix("PB · "),color=MiuixTheme.colorScheme.primary)}
             }}}
             item{Card(Modifier.cardPadding()){Column(Modifier.padding(18.dp)){
                 Text("动作说明",style=MiuixTheme.textStyles.title3);Text(e.instructionsZh.ifBlank{e.instructionsEn})
@@ -76,25 +80,35 @@ fun ExerciseDetailScreen(vm:MainViewModel,id:String,onBack:()->Unit){
             }}}
         }}
     }
-    ex?.let{e->ExerciseRenameSheet(showRename,e.nameZh,e.datasetNameZh,!e.isCustom,{showRename=false},{name->vm.updateExerciseName(e.id,name);showRename=false},{vm.restoreExerciseName(e.id);showRename=false})}
+    ex?.let{e->ExerciseRenameSheet(showRename,e.nameZh,e.datasetNameZh,!e.isCustom,{showRename=false},{name->vm.updateExerciseName(e.id,name){showRename=false}},{vm.restoreExerciseName(e.id){showRename=false}})}
 }
 
 @Composable
-private fun ExerciseRenameSheet(show:Boolean,currentName:String,datasetName:String,canRestore:Boolean,onDismiss:()->Unit,onSave:(String)->Unit,onRestore:()->Unit){
+private fun ExerciseRenameSheet(show:Boolean,currentName:String,datasetName:String,canRestore:Boolean,onDismiss:()->Unit,onSave:(String)->Job,onRestore:()->Job){
     var name by remember(show,currentName){mutableStateOf(currentName)}
+    var saving by remember{mutableStateOf(false)}
+    val scope=rememberCoroutineScope()
+    fun save(action:()->Job) {
+        if(saving)return
+        saving=true
+        val job=action()
+        scope.launch { try { job.join() } finally { saving=false } }
+    }
     WindowDialog(show=show,title="修改动作中文名",summary="已有训练历史仍保留当时的名称。",onDismissRequest=onDismiss){
         val dismissState=LocalDismissState.current
         Column(verticalArrangement=Arrangement.spacedBy(12.dp)){
             TextField(name,{name=it},label="中文显示名",modifier=Modifier.fillMaxWidth())
-            if(canRestore&&datasetName.isNotBlank()&&currentName!=datasetName)TextButton("恢复数据集原名",onClick=onRestore,modifier=Modifier.fillMaxWidth())
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(20.dp)){TextButton("取消",onClick={dismissState?.invoke()},modifier=Modifier.weight(1f));TextButton("保存",enabled=name.trim().isNotEmpty(),onClick={onSave(name.trim());dismissState?.invoke()},colors=ButtonDefaults.textButtonColorsPrimary(),modifier=Modifier.weight(1f))}
+            if(canRestore&&datasetName.isNotBlank()&&currentName!=datasetName)TextButton("恢复数据集原名",enabled=!saving,onClick={save(onRestore)},modifier=Modifier.fillMaxWidth())
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(20.dp)){TextButton("取消",onClick={dismissState?.invoke()},modifier=Modifier.weight(1f));TextButton(if(saving)"正在保存…" else "保存",enabled=!saving&&name.trim().isNotEmpty(),onClick={save{onSave(name.trim())}},colors=ButtonDefaults.textButtonColorsPrimary(),modifier=Modifier.weight(1f))}
         }
     }
 }
 
 @Composable
 fun CustomExerciseScreen(vm:MainViewModel,onBack:()->Unit){
-    var name by remember{mutableStateOf("")};var body by remember{mutableStateOf("")};var equipment by remember{mutableStateOf("")};var note by remember{mutableStateOf("")};var trackingMode by remember{mutableStateOf(TrackingMode.STRENGTH)}
+    var name by rememberSaveable{mutableStateOf("")};var body by rememberSaveable{mutableStateOf("")};var equipment by rememberSaveable{mutableStateOf("")};var note by rememberSaveable{mutableStateOf("")};var trackingMode by rememberSaveable{mutableStateOf(TrackingMode.STRENGTH)}
+    val scope=rememberCoroutineScope()
+    var saving by remember{mutableStateOf(false)}
     MiuixPageScaffold(title="自定义动作",navigationIcon={BackButton(onBack)}){pad->
         Column(Modifier.fillMaxSize().padding(pad).imePadding().verticalScroll(rememberScrollState()).padding(12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
             TextField(name,{name=it},label="动作名称")
@@ -107,7 +121,11 @@ fun CustomExerciseScreen(vm:MainViewModel,onBack:()->Unit){
             if(trackingMode==TrackingMode.STRENGTH)TextField(body,{body=it},label="训练部位")
             TextField(equipment,{equipment=it},label="器械")
             TextField(note,{note=it},label="动作说明")
-            Button(enabled=name.isNotBlank(),onClick={vm.saveCustom(name,body,equipment,note,trackingMode);onBack()},modifier=Modifier.fillMaxWidth()){Text("保存动作")}
+            Button(enabled=name.isNotBlank()&&!saving,onClick={
+                saving=true
+                val job=vm.saveCustom(name.trim(),body,equipment,note,trackingMode,onDone=onBack)
+                scope.launch { try { job.join() } finally { saving=false } }
+            },modifier=Modifier.fillMaxWidth()){Text(if(saving)"正在保存…" else "保存动作")}
         }
     }
 }
