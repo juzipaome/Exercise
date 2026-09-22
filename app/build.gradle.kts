@@ -91,3 +91,9 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     debugImplementation("androidx.compose.ui:ui-test-manifest:1.12.0-rc01")
 }
+
+// Espresso 3.7.0 requires concurrent-futures 1.2.0. Keep AndroidTest
+// resolution deterministic when a CI Gradle cache contains an older lock.
+configurations.matching { it.name.contains("AndroidTest") }.configureEach {
+    resolutionStrategy.force("androidx.concurrent:concurrent-futures:1.2.0")
+}
