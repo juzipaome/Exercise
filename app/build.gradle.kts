@@ -25,8 +25,8 @@ android {
         applicationId = "com.juzi.lianji"
         minSdk = 35
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
         testInstrumentationRunner = "com.juzi.lianji.RegressionTestRunner"
     }
     experimentalProperties["android.experimental.r8.dex-startup-optimization"] = true
@@ -59,7 +59,7 @@ kotlin {
     }
 }
 
-val miuixVersion = "0.9.4-rc01"
+val miuixVersion = "0.9.4"
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 
 dependencies {

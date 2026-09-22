@@ -94,7 +94,7 @@ private fun ExerciseRenameSheet(show:Boolean,currentName:String,datasetName:Stri
         val job=action()
         scope.launch { try { job.join() } finally { saving=false } }
     }
-    WindowDialog(show=show,title="修改动作中文名",summary="已有训练历史仍保留当时的名称。",onDismissRequest=onDismiss){
+    WindowDialog(show=show,title="修改动作中文名",summary="已有训练历史仍保留当时的名称。",onDismissRequest=onDismiss,largeScreen=LocalMiuixFeatureSettings.current.largeScreenDialogs){
         val dismissState=LocalDismissState.current
         Column(verticalArrangement=Arrangement.spacedBy(12.dp)){
             TextField(name,{name=it},label="中文显示名",modifier=Modifier.fillMaxWidth())

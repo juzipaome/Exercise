@@ -1,10 +1,6 @@
 package com.juzi.lianji.ui
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.animation.core.EaseInOut
-import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.MutatePriority
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
@@ -34,7 +30,9 @@ import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurDefaults
 import top.yukonga.miuix.kmp.blur.BlurColors
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
+import top.yukonga.miuix.kmp.blur.ProgressiveBlur
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.progressiveTextureBlur
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -47,8 +45,12 @@ import top.yukonga.miuix.kmp.nav.core.rememberNavSystemCornerRadius
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.LocalDismissState
 import top.yukonga.miuix.kmp.window.WindowDialog
+import top.yukonga.miuix.kmp.utils.PagerGestureNestedScrollConnection
+import top.yukonga.miuix.kmp.utils.pagerGestureOverride
+import top.yukonga.miuix.kmp.utils.springAnimateToPage
 import java.time.YearMonth
-import kotlin.math.abs
+
+val LocalMiuixFeatureSettings = staticCompositionLocalOf { AppSettings() }
 
 @Serializable
 sealed interface AppScreen : NavKey {
@@ -104,10 +106,12 @@ fun LianJiApp(vm: MainViewModel, requestedWorkoutId: Long? = null, onWorkoutOpen
         AppScreen.About -> AboutScreen(::animatedPop)
     } }
     LianJiTheme(state.settings) {
+        CompositionLocalProvider(LocalMiuixFeatureSettings provides state.settings) {
         val operationError by vm.operationError.collectAsStateWithLifecycle()
-        WindowDialog(show=operationError!=null,title="操作未完成",summary=operationError,onDismissRequest=vm::dismissOperationError) {
+        WindowDialog(show=operationError!=null,title="操作未完成",summary=operationError,onDismissRequest=vm::dismissOperationError,largeScreen=state.settings.largeScreenDialogs) {
             val dismiss=LocalDismissState.current
             TextButton("知道了",onClick={dismiss?.invoke()},modifier=Modifier.fillMaxWidth())
+        }
         }
         val navCornerRadius = rememberNavSystemCornerRadius()
         val navBackdropColor = MiuixTheme.colorScheme.surface
@@ -189,7 +193,7 @@ private fun MainTabs(vm:MainViewModel,selectedPage:Int,onSelectedPage:(Int)->Uni
                     }
                     Box(
                         Modifier
-                            .textureBlur(backdrop=backdrop,shape=RectangleShape,blurRadius=25f,colors=navigationBarBlurColors)
+                            .then(if (state.settings.progressiveBlur) Modifier.progressiveTextureBlur(backdrop=backdrop,shape=RectangleShape,blurRadius=25f,gradient=ProgressiveBlur.Top,colors=navigationBarBlurColors) else Modifier.textureBlur(backdrop=backdrop,shape=RectangleShape,blurRadius=25f,colors=navigationBarBlurColors))
                             .topAppBarDoubleTap { scrollToTop() },
                     ) {
                         val barActions: @Composable RowScope.() -> Unit = {
@@ -220,7 +224,13 @@ private fun MainTabs(vm:MainViewModel,selectedPage:Int,onSelectedPage:(Int)->Uni
                 snackbarHost={SnackbarHost(snackbarHostState)},
             ) { padding ->
                 Box(Modifier.fillMaxSize().layerBackdrop(backdrop)) {
-                    HorizontalPager(state=pager,modifier=Modifier.fillMaxSize(),verticalAlignment=androidx.compose.ui.Alignment.Top) { page ->
+                    HorizontalPager(
+                        state=pager,
+                        modifier=Modifier.fillMaxSize().then(if (state.settings.pagerGestureOverride) Modifier.pagerGestureOverride(pager) else Modifier),
+                        userScrollEnabled=!state.settings.pagerGestureOverride,
+                        pageNestedScrollConnection=if (state.settings.pagerGestureOverride) PagerGestureNestedScrollConnection else androidx.compose.foundation.pager.PagerDefaults.pageNestedScrollConnection(pager, androidx.compose.foundation.gestures.Orientation.Horizontal),
+                        verticalAlignment=androidx.compose.ui.Alignment.Top,
+                    ) { page ->
                         when(page) {
                             0 -> WorkoutHomeScreen(homeState,padding,listStates[0],scrollBehaviors[0],onEdit={onNavigate(AppScreen.EditPlan(it))},onStart={vm.start(it){id->onNavigate(AppScreen.Workout(id))}},onContinue={homeState.active?.let{onNavigate(AppScreen.Workout(it.id))}},onDuplicate=vm::duplicatePlan,onDelete=vm::deletePlan)
                             1 -> CalendarScreen(vm,padding,listStates[1],scrollBehaviors[1],onDay={onNavigate(AppScreen.Day(it))},onMonth={onNavigate(AppScreen.MonthAnalytics(it.toString()))})
@@ -243,17 +253,21 @@ private fun MainNavigationBar(
     blurColors:BlurColors,
 ) {
     val page=pagerState.selectedPage
+    val blurModifier: Modifier.(Shape) -> Modifier = { shape ->
+        if (settings.progressiveBlur) progressiveTextureBlur(backdrop=backdrop,shape=shape,blurRadius=25f,gradient=ProgressiveBlur.Bottom,colors=blurColors)
+        else textureBlur(backdrop=backdrop,shape=shape,blurRadius=25f,colors=blurColors)
+    }
     when(settings.navigationBarStyle) {
         "FLOATING" -> {
             val shape:Shape=RoundedCornerShape(FloatingToolbarDefaults.CornerRadius)
             FloatingNavigationBar(
-                modifier=Modifier.textureBlur(backdrop=backdrop,shape=shape,blurRadius=25f,colors=BlurDefaults.blurColors(blendColors=listOf(BlendColorEntry(MiuixTheme.colorScheme.surfaceContainer.copy(alpha=.6f))))),
+                modifier=Modifier.blurModifier(shape),
                 color=Color.Transparent,
                 horizontalAlignment=when(settings.floatingNavigationBarPosition){"START"->Alignment.Start;"END"->Alignment.End;else->Alignment.CenterHorizontally},
             ) { items.forEachIndexed{i,item->FloatingNavigationBarItem(selected=page==i,onClick={pagerState.animateToPage(i)},icon=item.icon,label=item.label)} }
         }
         "LIQUID" -> IosLiquidGlassNavigationBar(items,page,{pagerState.animateToPage(it)},backdrop,true)
-        else -> Box(Modifier.textureBlur(backdrop=backdrop,shape=RectangleShape,blurRadius=25f,colors=blurColors)) {
+        else -> Box(Modifier.blurModifier(RectangleShape)) {
             NavigationBar(color=Color.Transparent,mode=when(settings.navigationBarMode){"ICON_ONLY"->NavigationBarDisplayMode.IconOnly;"SELECTED_LABEL"->NavigationBarDisplayMode.IconWithSelectedLabel;else->NavigationBarDisplayMode.IconAndText}) {
                 items.forEachIndexed{i,item->NavigationBarItem(selected=page==i,onClick={pagerState.animateToPage(i)},icon=item.icon,label=item.label)}
             }
@@ -261,7 +275,7 @@ private fun MainNavigationBar(
     }
 }
 
-/** Kept in sync with the MainPagerState shipped in the MIUIX 0.9.4-rc01 example app. */
+/** Kept in sync with the MainPagerState shipped in the MIUIX 0.9.4 example app. */
 @Stable
 private class MainPagerState(
     val pagerState:PagerState,
@@ -281,23 +295,7 @@ private class MainPagerState(
         navJob=coroutineScope.launch {
             val myJob=coroutineContext.job
             try {
-                pagerState.scroll(MutatePriority.UserInput) {
-                    val distance=abs(targetIndex-pagerState.currentPage).coerceAtLeast(2)
-                    val duration=100*distance+100
-                    val layoutInfo=pagerState.layoutInfo
-                    val pageSize=layoutInfo.pageSize+layoutInfo.pageSpacing
-                    val currentDistanceInPages=targetIndex-pagerState.currentPage-pagerState.currentPageOffsetFraction
-                    val scrollPixels=currentDistanceInPages*pageSize
-                    var previousValue=0f
-                    animate(
-                        initialValue=0f,
-                        targetValue=scrollPixels,
-                        animationSpec=tween(durationMillis=duration,easing=EaseInOut),
-                    ){currentValue,_->
-                        previousValue+=scrollBy(currentValue-previousValue)
-                    }
-                }
-                if(pagerState.currentPage!=targetIndex)pagerState.scrollToPage(targetIndex)
+                pagerState.springAnimateToPage(targetIndex)
             } finally {
                 if(navJob==myJob) {
                     isNavigating=false

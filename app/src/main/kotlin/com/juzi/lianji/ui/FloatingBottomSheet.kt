@@ -20,7 +20,7 @@ import top.yukonga.miuix.kmp.window.WindowBottomSheet
 import top.yukonga.miuix.kmp.window.WindowDialog
 
 /**
- * Project-wide sheet entry point backed entirely by MIUIX 0.9.4-rc01.
+ * Project-wide sheet entry point backed entirely by MIUIX 0.9.4.
  * MIUIX owns the scrim, enter/exit motion, drag handling and outside-tap dismissal.
  */
 @Composable
@@ -65,6 +65,7 @@ fun MiuixActionDialog(
         title = title,
         summary = summary,
         onDismissRequest = onDismissRequest,
+        largeScreen = LocalMiuixFeatureSettings.current.largeScreenDialogs,
     ) {
         val dismissState = LocalDismissState.current
         Row(horizontalArrangement = Arrangement.SpaceBetween) {

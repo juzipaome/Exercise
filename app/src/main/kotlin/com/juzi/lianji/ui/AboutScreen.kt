@@ -68,7 +68,7 @@ fun AboutScreen(onBack:()->Unit) {
     }
     val backdrop=if(isRuntimeShaderSupported())rememberLayerBackdrop{drawRect(surface);drawContent()}else null
     val collapsed=scrollProgress==1f
-    val version=remember(context){context.packageManager.getPackageInfo(context.packageName,PackageManager.PackageInfoFlags.of(0)).versionName?:"0.1.0"}
+    val version=remember(context){context.packageManager.getPackageInfo(context.packageName,PackageManager.PackageInfoFlags.of(0)).versionName?:"0.2.0"}
 
     Scaffold(topBar={
         Box(modifier=if(backdrop!=null&&collapsed)Modifier.textureBlur(backdrop,RectangleShape,25f,colors=BlurDefaults.blurColors(blendColors=listOf(BlendColorEntry(surface.copy(alpha=.8f)))))else Modifier){
@@ -111,7 +111,7 @@ fun AboutScreen(onBack:()->Unit) {
                 item(key="sources"){
                     AboutGlassCard(backdrop,dark){
                         ArrowPreference(title="动作数据",summary="hasaneyldrm/exercises-dataset",endActions={AboutValue("MIT")},onClick={uriHandler.openUri("https://github.com/hasaneyldrm/exercises-dataset")})
-                        ArrowPreference(title="界面框架",summary="Miuix for Compose",endActions={AboutValue("0.9.4-rc01")},onClick={uriHandler.openUri("https://github.com/compose-miuix-ui/miuix")})
+                        ArrowPreference(title="界面框架",summary="Miuix for Compose",endActions={AboutValue("0.9.4")},onClick={uriHandler.openUri("https://github.com/compose-miuix-ui/miuix")})
                     }
                 }
                 item(key="privacy"){

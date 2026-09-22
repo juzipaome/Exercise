@@ -44,6 +44,12 @@ fun SettingsScreen(state:MainUiState,padding:PaddingValues,listState:LazyListSta
             AnimatedVisibility(state.settings.navigationBarStyle=="STANDARD"){OverlayDropdownPreference(items=navigationModeOptions,selectedIndex=navigationModes.indexOf(state.settings.navigationBarMode).coerceAtLeast(0),title="标签显示",onSelectedIndexChange={scope.launch{vm.settingsStore.setNavigationBarMode(navigationModes[it])}})}
             AnimatedVisibility(state.settings.navigationBarStyle=="FLOATING"){OverlayDropdownPreference(items=floatingPositionOptions,selectedIndex=floatingPositions.indexOf(state.settings.floatingNavigationBarPosition).coerceAtLeast(0),title="悬浮位置",onSelectedIndexChange={scope.launch{vm.settingsStore.setFloatingNavigationBarPosition(floatingPositions[it])}})}
         }}}
+        item{SmallTitle("MIUIX 特性")}
+        item{Card(Modifier.cardPadding()){Column{
+            SwitchPreference(checked=state.settings.pagerGestureOverride,onCheckedChange={scope.launch{vm.settingsStore.setPagerGestureOverride(it)}},title="增强分页手势",summary="列表滚动或回弹时仍可横向切换主页面")
+            SwitchPreference(checked=state.settings.progressiveBlur,onCheckedChange={scope.launch{vm.settingsStore.setProgressiveBlur(it)}},title="渐进模糊",summary="让顶栏和导航栏的模糊逐渐过渡到清晰")
+            SwitchPreference(checked=state.settings.largeScreenDialogs,onCheckedChange={scope.launch{vm.settingsStore.setLargeScreenDialogs(it)}},title="大屏对话框",summary="在宽屏上使用 MIUIX 居中缩放样式")
+        }}}
         item{SmallTitle("训练提醒")}
         item{Card(Modifier.cardPadding()){Column{OverlayDropdownPreference(items=restOptions.map(::formatRestLabel),selectedIndex=restOptions.indexOf(state.settings.defaultRestSeconds).coerceAtLeast(0),title="默认组间休息",startAction={Icon(MiuixIcons.Timer,null)},onSelectedIndexChange={scope.launch{vm.settingsStore.setRest(restOptions[it])}});SwitchPreference(checked=state.settings.vibration,onCheckedChange={scope.launch{vm.settingsStore.setVibration(it)}},title="震动提醒",summary="休息结束时振动提示");SwitchPreference(checked=state.settings.sound,onCheckedChange={scope.launch{vm.settingsStore.setSound(it)}},title="提示音",summary="休息结束时播放提示音")}}}
         item{Card(Modifier.cardPadding()){ArrowPreference(title="准时休息提醒",summary=if(exactAlarms)"已允许；可在离开应用后按时提醒" else "未允许精确闹钟，后台提醒可能延迟；点击设置",onClick={alarmPermission.launch(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,Uri.parse("package:${context.packageName}")))})}}
