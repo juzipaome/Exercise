@@ -2,8 +2,13 @@ package com.juzi.lianji.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+
+internal object NoHapticFeedback : HapticFeedback {
+    override fun performHapticFeedback(hapticFeedbackType: HapticFeedbackType) = Unit
+}
 
 /** Uses the same toggle haptic as MIUIX Checkbox when its surrounding row is tapped. */
 @Composable

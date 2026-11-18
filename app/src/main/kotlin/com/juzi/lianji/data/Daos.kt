@@ -43,6 +43,7 @@ interface PlanDao {
 interface ScheduleDao {
     @Query("SELECT * FROM scheduled_workouts WHERE scheduledDate >= :fromDate AND scheduledDate < :untilDate ORDER BY scheduledDate") fun observeRange(fromDate: String, untilDate: String): Flow<List<ScheduledWorkoutEntity>>
     @Query("SELECT * FROM scheduled_workouts") suspend fun getAll(): List<ScheduledWorkoutEntity>
+    @Query("SELECT id FROM scheduled_workouts WHERE planId = :planId AND scheduledDate = :scheduledDate LIMIT 1") suspend fun idForPlanOnDate(planId: Long, scheduledDate: String): Long?
     @Insert suspend fun insert(item: ScheduledWorkoutEntity): Long
     @Update suspend fun update(item: ScheduledWorkoutEntity)
     @Delete suspend fun delete(item: ScheduledWorkoutEntity)
@@ -107,6 +108,7 @@ interface SessionDao {
     @Query("UPDATE workout_sets SET weightKg=:weight, reps=:reps WHERE id=:setId") suspend fun updateSetValues(setId:Long,weight:Double,reps:Int)
     @Query("UPDATE workout_sets SET durationSeconds=:durationSeconds, distanceKm=:distanceKm WHERE id=:setId") suspend fun updateCardioValues(setId:Long,durationSeconds:Int,distanceKm:Double)
     @Query("UPDATE session_exercises SET restSeconds=:seconds WHERE sessionId=:sessionId") suspend fun updateSessionRest(sessionId:Long,seconds:Int)
+    @Query("UPDATE workout_sessions SET restSecondsOverride=:seconds WHERE id=:sessionId") suspend fun updateSessionRestOverride(sessionId: Long, seconds: Int)
     @Query("SELECT ws.* FROM workout_sets ws JOIN session_exercises se ON se.id=ws.sessionExerciseId WHERE se.sessionId=:sessionId AND ws.restStartedAt IS NOT NULL AND ws.restEndedAt IS NULL ORDER BY ws.restStartedAt DESC LIMIT 1") suspend fun getOpenRest(sessionId: Long): WorkoutSetEntity?
     @Query("UPDATE workout_sets SET restEndedAt=:now, restDurationSeconds=MAX(0, (:now-restStartedAt)/1000) WHERE sessionExerciseId IN (SELECT id FROM session_exercises WHERE sessionId=:sessionId) AND restStartedAt IS NOT NULL AND restEndedAt IS NULL") suspend fun closeOpenRests(sessionId: Long, now: Long)
     @Query("SELECT ws.* FROM workout_sets ws JOIN session_exercises se ON se.id=ws.sessionExerciseId WHERE se.sessionId=:sessionId AND ws.id!=:exceptSetId AND ws.startedAt IS NOT NULL AND ws.completed=0 AND ws.pausedAt IS NULL") suspend fun getRunningSetsExcept(sessionId:Long,exceptSetId:Long):List<WorkoutSetEntity>

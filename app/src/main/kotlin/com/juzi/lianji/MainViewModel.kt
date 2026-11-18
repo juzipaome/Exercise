@@ -61,18 +61,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun createPlan(name: String, exerciseIds: List<String>, onDone: (Long)->Unit = {}) = launchAction {
-        val id = repository.save(WorkoutPlanEntity(name = name), exerciseIds.mapIndexed { i, ex -> PlanExerciseEntity(planId=0,exerciseId=ex,position=i,restSeconds=state.value.settings.defaultRestSeconds) })
+        val trimmed = name.trim()
+        require(trimmed.isNotEmpty()) { "请输入计划名称" }
+        val id = repository.save(WorkoutPlanEntity(name = trimmed), exerciseIds.mapIndexed { i, ex -> PlanExerciseEntity(planId=0,exerciseId=ex,position=i,restSeconds=state.value.settings.defaultRestSeconds) })
         onDone(id)
     }
     fun loadPlan(id:Long,onDone:(WorkoutPlanEntity,List<String>)->Unit)=launchAction {
         repository.plan(id)?.let { (plan,items) -> onDone(plan,items.map { it.exerciseId }) }
     }
     fun savePlan(id:Long,name:String,exerciseIds:List<String>,onDone:(Long)->Unit={})=launchAction {
+        val trimmed = name.trim()
+        require(trimmed.isNotEmpty()) { "请输入计划名称" }
         val (existing,items)=repository.plan(id) ?: error("计划不存在")
         val byExercise=items.associateBy { it.exerciseId }
-        onDone(repository.save(existing.copy(name=name),exerciseIds.mapIndexed{i,ex->
+        onDone(repository.save(existing.copy(name=trimmed),exerciseIds.mapIndexed{i,ex->
             byExercise[ex]?.copy(position=i) ?: PlanExerciseEntity(planId=id,exerciseId=ex,position=i,restSeconds=state.value.settings.defaultRestSeconds)
         }))
+    }
+    fun scheduleWorkout(planId: Long, date: LocalDate, onDone: () -> Unit = {}) = launchAction {
+        repository.schedule(planId, date)
+        onDone()
     }
     fun deletePlan(id: Long) = launchAction { repository.delete(id) }
     fun duplicatePlan(id: Long) = launchAction { repository.duplicate(id) }

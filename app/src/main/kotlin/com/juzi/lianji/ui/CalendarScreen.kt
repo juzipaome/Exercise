@@ -10,11 +10,12 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.juzi.lianji.MainViewModel
 import com.juzi.lianji.data.*
@@ -27,10 +28,10 @@ import top.yukonga.miuix.kmp.preference.RadioButtonPreference
 import top.yukonga.miuix.kmp.preference.CheckboxLocation
 import top.yukonga.miuix.kmp.preference.CheckboxPreference
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.ExpandLess
-import top.yukonga.miuix.kmp.icon.extended.ExpandMore
-import top.yukonga.miuix.kmp.icon.extended.Add
-import top.yukonga.miuix.kmp.icon.extended.ChevronForward
+import top.yukonga.miuix.kmp.icon.glass.Add
+import top.yukonga.miuix.kmp.icon.glass.ChevronForward
+import top.yukonga.miuix.kmp.icon.glass.ExpandLess
+import top.yukonga.miuix.kmp.icon.glass.ExpandMore
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import top.yukonga.miuix.kmp.anim.folmeSpring
 import java.time.YearMonth
@@ -47,8 +48,20 @@ import kotlinx.coroutines.launch
     val sessions by remember(vm,month){vm.repository.sessions(month.atDay(1).toString(),month.plusMonths(1).atDay(1).toString())}.collectAsStateWithLifecycle(emptyList())
     val summaries=remember(days){days.groupBy{it.localDate}}
     val completed=sessions.filter{it.localDate.startsWith(month.toString())&&it.status=="COMPLETED"};val trainingDays=completed.map{it.localDate}.distinct().size;val seconds=completed.sumOf{((it.endedAt?:it.startedAt)-it.startedAt).coerceAtLeast(0)}/1000
-    LazyColumn(Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),state=listState,contentPadding=PaddingValues(top=padding.calculateTopPadding()+12.dp,bottom=padding.calculateBottomPadding()+24.dp)){
-        item{Card(modifier=Modifier.fillMaxWidth().cardPadding(),pressFeedbackType=PressFeedbackType.Sink,onClick={onMonth(month)}){Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("本月概览",style=MiuixTheme.textStyles.title2);Text("${month.format(DateTimeFormatter.ofPattern("yyyy年 M月"))} · 点击查看详细分析",color=MiuixTheme.colorScheme.onSurfaceSecondary)};Icon(MiuixIcons.ChevronForward,"查看月度分析")};Row(Modifier.fillMaxWidth()){MonthStat(trainingDays.toString(),"训练日",Modifier.weight(1f));MonthStat(completed.size.toString(),"训练次数",Modifier.weight(1f));MonthStat(formatLongDuration(seconds),"总时长",Modifier.weight(1f))}}}}
+    val layoutDirection = LocalLayoutDirection.current
+    LazyColumn(
+        Modifier
+            .fillMaxSize()
+            .os4ScrollModifiers(scrollBehavior),
+        state = listState,
+        contentPadding = PaddingValues(
+            start = padding.calculateStartPadding(layoutDirection),
+            end = padding.calculateEndPadding(layoutDirection),
+            top = padding.calculateTopPadding() + 12.dp,
+            bottom = padding.calculateBottomPadding() + 24.dp,
+        ),
+    ) {
+        item{Card(modifier=Modifier.fillMaxWidth().cardPadding(),pressFeedbackType=PressFeedbackType.Sink,onClick={onMonth(month)}){Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("本月概览",style=MiuixTheme.textStyles.title2);Text("${month.format(DateTimeFormatter.ofPattern("yyyy年 M月"))} · 点击查看详细分析",color=MiuixTheme.colorScheme.onSurfaceSecondary)};Icon(MiuixIcons.Glass.ChevronForward,"查看月度分析",Modifier.size(22.dp))};Row(Modifier.fillMaxWidth()){MonthStat(trainingDays.toString(),"训练日",Modifier.weight(1f));MonthStat(completed.size.toString(),"训练次数",Modifier.weight(1f));MonthStat(formatLongDuration(seconds),"总时长",Modifier.weight(1f))}}}}
         item{Card(Modifier.cardPadding()){Column(Modifier.padding(horizontal=4.dp,vertical=12.dp)){
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){PreviousButton{monthValue=month.minusMonths(1).toString()};Text(month.format(DateTimeFormatter.ofPattern("yyyy年 M月")),style=MiuixTheme.textStyles.title2);NextButton{monthValue=month.plusMonths(1).toString()}}
             Row(Modifier.fillMaxWidth()){listOf("一","二","三","四","五","六","日").forEach{Text(it,Modifier.weight(1f),textAlign=TextAlign.Center,color=MiuixTheme.colorScheme.onSurfaceSecondary)}}
@@ -126,28 +139,98 @@ import kotlinx.coroutines.launch
 }
 
 @Composable
-fun DayDetailScreen(vm:MainViewModel,date:String,onBack:()->Unit) {
+fun DayDetailScreen(
+    vm: MainViewModel,
+    date: String,
+    onBack: () -> Unit,
+    onStartWorkout: (Long) -> Unit = {},
+) {
     val state by vm.state.collectAsStateWithLifecycle()
-    val scope=rememberCoroutineScope()
-    var saving by remember{mutableStateOf(false)}
-    var showAddPast by remember{mutableStateOf(false)}
-    var selectedPlanId by remember{mutableStateOf<Long?>(null)}
-    var candidatePlanId by remember{mutableStateOf<Long?>(null)}
-    var selectedPlanName by remember{mutableStateOf("")}
-    var planExerciseIds by remember{mutableStateOf<List<String>>(emptyList())}
-    var selectedExerciseIds by remember{mutableStateOf<Set<String>>(emptySet())}
-    var startTime by remember{mutableStateOf("18:00")}
-    var endTime by remember{mutableStateOf("19:00")}
-    var cardioDistances by remember{mutableStateOf<Map<String,String>>(emptyMap())}
-    var cardioDurations by remember{mutableStateOf<Map<String,String>>(emptyMap())}
-    val untilDate=remember(date){LocalDate.parse(date).plusDays(1).toString()}
-    val sessions by remember(vm,date){vm.repository.sessions(date,untilDate)}.collectAsStateWithLifecycle(emptyList())
-    val schedules by remember(vm,date){vm.repository.schedules(date,untilDate)}.collectAsStateWithLifecycle(emptyList())
-    MiuixPageScaffold(title=date,navigationIcon={BackButton(onBack)},actions={if(!LocalDate.parse(date).isAfter(LocalDate.now()))IconButton(onClick={showAddPast=true}){Icon(MiuixIcons.Add,"补录过去训练")}}) { pad ->
-        LazyColumn(contentPadding=PaddingValues(top=pad.calculateTopPadding()+12.dp,bottom=24.dp)) {
-            if(sessions.isEmpty()&&schedules.isEmpty()) item{EmptyCard("这天没有训练","可以在计划中安排训练")}
-            items(sessions,key={it.id}){SessionHistoryCard(vm,it)}
-            items(schedules,key={"schedule-${it.id}"}){ScheduleHistoryCard(vm,it)}
+    val scope = rememberCoroutineScope()
+    val dayScrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
+    val parsedDate = remember(date) { LocalDate.parse(date) }
+    val isFuture = parsedDate.isAfter(LocalDate.now())
+    var saving by remember { mutableStateOf(false) }
+    var showAddPast by remember { mutableStateOf(false) }
+    var showScheduleSheet by remember { mutableStateOf(false) }
+    var scheduleCandidatePlanId by remember { mutableStateOf<Long?>(null) }
+    var selectedPlanId by remember { mutableStateOf<Long?>(null) }
+    var candidatePlanId by remember { mutableStateOf<Long?>(null) }
+    var selectedPlanName by remember { mutableStateOf("") }
+    var planExerciseIds by remember { mutableStateOf<List<String>>(emptyList()) }
+    var selectedExerciseIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var startTime by remember { mutableStateOf("18:00") }
+    var endTime by remember { mutableStateOf("19:00") }
+    var cardioDistances by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var cardioDurations by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    val untilDate = remember(date) { LocalDate.parse(date).plusDays(1).toString() }
+    val sessions by remember(vm, date) { vm.repository.sessions(date, untilDate) }.collectAsStateWithLifecycle(emptyList())
+    val schedules by remember(vm, date) { vm.repository.schedules(date, untilDate) }.collectAsStateWithLifecycle(emptyList())
+    MiuixPageScaffold(
+        title = date,
+        navigationIcon = { BackButton(onBack) },
+        scrollBehavior = dayScrollBehavior,
+        actions = {
+            if (isFuture) {
+                TopBarIconButton(onClick = { scheduleCandidatePlanId = state.plans.firstOrNull()?.id; showScheduleSheet = true }) {
+                    Icon(
+                        imageVector = MiuixIcons.Glass.Add,
+                        contentDescription = "安排训练",
+                        modifier = Modifier.size(28.dp),
+                        tint = MiuixTheme.colorScheme.onSurface,
+                    )
+                }
+            } else {
+                TopBarIconButton(onClick = { showAddPast = true }) {
+                    Icon(
+                        imageVector = MiuixIcons.Glass.Add,
+                        contentDescription = "补录过去训练",
+                        modifier = Modifier.size(28.dp),
+                        tint = MiuixTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+        },
+    ) { pad ->
+        LazyColumn(
+            Modifier
+                .fillMaxSize()
+                .os4ScrollModifiers(dayScrollBehavior),
+            contentPadding = pad.withPageSpacing(),
+        ) {
+            if (sessions.isEmpty() && schedules.isEmpty()) item { EmptyCard("这天没有训练", "可以在计划中安排训练") }
+            items(sessions, key = { it.id }) { SessionHistoryCard(vm, it) }
+            items(schedules, key = { "schedule-${it.id}" }) { ScheduleHistoryCard(vm, it, state.plans, onStartWorkout) }
+        }
+    }
+    FloatingBottomSheet(showScheduleSheet, "安排 $date 的训练", { showScheduleSheet = false }) {
+        if (state.plans.isEmpty()) {
+            Text("请先在运动页创建训练计划。", color = MiuixTheme.colorScheme.onSurfaceSecondary)
+        } else {
+            state.plans.forEach { plan ->
+                RadioButtonPreference(
+                    title = plan.name,
+                    summary = "${plan.exerciseCount} 个动作",
+                    selected = scheduleCandidatePlanId == plan.id,
+                    radioButtonLocation = RadioButtonLocation.End,
+                    onClick = { scheduleCandidatePlanId = plan.id },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(onClick = { showScheduleSheet = false }, modifier = Modifier.weight(1f)) { Text("取消") }
+                Button(
+                    enabled = scheduleCandidatePlanId != null,
+                    onClick = {
+                        scheduleCandidatePlanId?.let { planId ->
+                            vm.scheduleWorkout(planId, parsedDate) { showScheduleSheet = false }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColorsPrimary(),
+                    modifier = Modifier.weight(1f),
+                ) { Text("确认安排") }
+            }
         }
     }
     FloatingBottomSheet(showAddPast,"补录 $date 的训练",{showAddPast=false}){
@@ -178,8 +261,20 @@ fun DayDetailScreen(vm:MainViewModel,date:String,onBack:()->Unit) {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(selectedPlanName,style=MiuixTheme.textStyles.title3);Text("选择实际完成的动作",color=MiuixTheme.colorScheme.onSurfaceSecondary)};TextButton("重选计划",onClick={selectedPlanId=null})}
             planExerciseIds.forEach { id -> state.exercises.firstOrNull{it.id==id}?.let { exercise ->
                 val checked=id in selectedExerciseIds
-                val toggle={selectedExerciseIds=if(checked)selectedExerciseIds-id else selectedExerciseIds+id}
-                CheckboxPreference(title=exercise.nameZh,summary=bodyPartLabel(exercise.bodyPart),checked=checked,onCheckedChange={toggle()},checkboxLocation=CheckboxLocation.End,modifier=Modifier.fillMaxWidth())
+                val toggle = hapticRowClick(checked) {
+                    selectedExerciseIds = if (checked) selectedExerciseIds - id else selectedExerciseIds + id
+                }
+                // MIUIX 0.9.5-beta01 sends its own toggle feedback only for the circle.
+                CompositionLocalProvider(LocalHapticFeedback provides NoHapticFeedback) {
+                    CheckboxPreference(
+                        title = exercise.nameZh,
+                        summary = bodyPartLabel(exercise.bodyPart),
+                        checked = checked,
+                        onCheckedChange = { toggle() },
+                        checkboxLocation = CheckboxLocation.End,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 if(checked&&exercise.trackingMode==TrackingMode.CARDIO) {
                     val selectedCardioCount=selectedExerciseIds.count{selectedId->state.exercises.firstOrNull{it.id==selectedId}?.trackingMode==TrackingMode.CARDIO}
                     val defaultDurationMinutes = if(selectedCardioCount==1)parseTimeMinute(startTime)?.let { start -> parseTimeMinute(endTime)?.takeIf{it>start}?.let { end -> pastWorkoutTimeRange(LocalDate.parse(date),start,end).durationSeconds/60.0 } } else null
@@ -232,13 +327,13 @@ private fun SessionHistoryCard(vm:MainViewModel,session:WorkoutSessionEntity) {
     var expanded by rememberSaveable(session.id){mutableStateOf(false)}
     var confirm by remember{mutableStateOf(false)}
     val groups=rows.filter{it.completed}.groupBy{it.sessionExerciseId}.values
-    val seconds=((session.endedAt?:System.currentTimeMillis())-session.startedAt)/1000
+    val seconds=(((session.endedAt?:System.currentTimeMillis())-session.startedAt)/1000).coerceAtLeast(0)
     Card(Modifier.cardPadding()) {
         Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Surface(onClick={expanded=!expanded},modifier=Modifier.fillMaxWidth().padding(vertical=4.dp).squircleClip(14.dp),color=Color.Transparent,shadowElevation=0.dp) {
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)){Text(session.planNameSnapshot,style=MiuixTheme.textStyles.title2);Text("${when(session.status){"COMPLETED"->"已完成";"INTERRUPTED"->"已中断";else->"进行中"}} · ${groups.size} 个动作 · ${formatDuration(seconds)}",color=MiuixTheme.colorScheme.onSurfaceSecondary)}
-                IconButton(onClick={expanded=!expanded}){Icon(if(expanded)MiuixIcons.ExpandLess else MiuixIcons.ExpandMore,if(expanded)"收起详情" else "展开详情")}
+                IconButton(onClick={expanded=!expanded}){Icon(if(expanded)MiuixIcons.Glass.ExpandLess else MiuixIcons.Glass.ExpandMore,if(expanded)"收起详情" else "展开详情",Modifier.size(22.dp))}
                 }
             }
             AnimatedVisibility(expanded,enter=expandVertically(animationSpec=folmeSpring(.9f,.32f))+fadeIn(folmeSpring(.9f,.28f)),exit=shrinkVertically(animationSpec=folmeSpring(.92f,.28f))+fadeOut(folmeSpring(.95f,.24f))) {
@@ -253,19 +348,38 @@ private fun SessionHistoryCard(vm:MainViewModel,session:WorkoutSessionEntity) {
 }
 
 @Composable
-private fun ScheduleHistoryCard(vm:MainViewModel,schedule:ScheduledWorkoutEntity) {
-    var confirm by remember{mutableStateOf(false)}
-    Card(Modifier.cardPadding()){Row(Modifier.fillMaxWidth().padding(18.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(schedule.planName,style=MiuixTheme.textStyles.title2);Text("训练已安排",color=StatusColors.Warning)};TextButton("删除安排",onClick={confirm=true})}}
-    DeleteConfirm(confirm,"删除训练安排","只删除这一天的安排，不会删除计划模板。",{confirm=false},{vm.deleteSchedule(schedule);confirm=false})
+private fun ScheduleHistoryCard(
+    vm: MainViewModel,
+    schedule: ScheduledWorkoutEntity,
+    plans: List<PlanSummary>,
+    onStartWorkout: (Long) -> Unit,
+) {
+    var confirm by remember { mutableStateOf(false) }
+    val activePlanId = schedule.planId?.takeIf { id -> plans.any { it.id == id } }
+    Card(Modifier.cardPadding()) {
+        Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(schedule.planName, style = MiuixTheme.textStyles.title2)
+                Text("训练已安排", color = StatusColors.Warning)
+            }
+            if (activePlanId != null) {
+                TextButton("开始", onClick = { onStartWorkout(activePlanId) })
+                Spacer(Modifier.width(8.dp))
+            }
+            TextButton("删除安排", onClick = { confirm = true })
+        }
+    }
+    DeleteConfirm(confirm, "删除训练安排", "只删除这一天的安排，不会删除计划模板。", { confirm = false }, { vm.deleteSchedule(schedule); confirm = false })
 }
 
 @Composable
-private fun DeleteConfirm(show:Boolean,title:String,message:String,onCancel:()->Unit,onConfirm:()->Unit) {
-    MiuixActionDialog(show,title,message,"取消","删除",onCancel,onCancel,onConfirm)
+private fun DeleteConfirm(show: Boolean, title: String, message: String, onCancel: () -> Unit, onConfirm: () -> Unit) {
+    MiuixActionDialog(show, title, message, "取消", "删除", onCancel, onCancel, onConfirm, destructivePrimary = true)
 }
 
 @Composable
 fun MonthAnalyticsScreen(vm:MainViewModel,month:YearMonth,onBack:()->Unit) {
+    val monthScrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
     val statsFlow=remember(vm,month){vm.repository.monthlyExerciseStats("$month%")}
     val exerciseStats by statsFlow.collectAsStateWithLifecycle(emptyList())
     val monthSessions by remember(vm,month){vm.repository.sessions(month.atDay(1).toString(),month.plusMonths(1).atDay(1).toString())}.collectAsStateWithLifecycle(emptyList())
@@ -287,8 +401,13 @@ fun MonthAnalyticsScreen(vm:MainViewModel,month:YearMonth,onBack:()->Unit) {
         "下午" to sessions.count{sessionHour(it) in 12..<18},
         "晚上" to sessions.count{sessionHour(it)>=18},
     )
-    MiuixPageScaffold(title=month.format(DateTimeFormatter.ofPattern("yyyy年 M月分析")),navigationIcon={BackButton(onBack)}){pad->
-        LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(top=pad.calculateTopPadding()+12.dp,bottom=24.dp)){
+    MiuixPageScaffold(title=month.format(DateTimeFormatter.ofPattern("yyyy年 M月分析")),navigationIcon={BackButton(onBack)},scrollBehavior=monthScrollBehavior){pad->
+        LazyColumn(
+            Modifier
+                .fillMaxSize()
+                .os4ScrollModifiers(monthScrollBehavior),
+            contentPadding = pad.withPageSpacing(),
+        ){
             item{Card(Modifier.cardPadding()){Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){Text("训练总览",style=MiuixTheme.textStyles.title2);Row(Modifier.fillMaxWidth()){MonthStat(sessions.size.toString(),"训练次数",Modifier.weight(1f));MonthStat(formatLongDuration(totalSeconds),"总时长",Modifier.weight(1f));MonthStat(formatLongDuration(averageSeconds),"平均时长",Modifier.weight(1f))};Row(Modifier.fillMaxWidth()){MonthStat(totalSets.toString(),"力量组数",Modifier.weight(1f));MonthStat(totalCardio.toString(),"有氧次数",Modifier.weight(1f));MonthStat(formatVolume(totalVolume),"训练容量",Modifier.weight(1f))};Row(Modifier.fillMaxWidth()){MonthStat(sessions.map{it.localDate}.distinct().size.toString(),"训练日",Modifier.weight(1f));Spacer(Modifier.weight(2f))}}}}
             item{AnalysisCard("训练时长分布",if(sessions.isEmpty())"本月还没有完成的训练" else "按每次训练的总时长统计",durationBuckets)}
             item{AnalysisCard("训练时段",if(sessions.isEmpty())"暂无时段数据" else "按开始训练的时间统计",timeBuckets)}

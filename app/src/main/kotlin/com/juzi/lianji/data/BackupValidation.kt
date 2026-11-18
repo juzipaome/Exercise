@@ -5,7 +5,7 @@ import java.time.LocalDate
 import kotlinx.serialization.json.Json
 
 internal fun backupFingerprint(backup: BackupEnvelope): String = MessageDigest.getInstance("SHA-256")
-    .digest(Json.encodeToString(backup).toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+    .digest(backupJson.encodeToString(backup).toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
 
 internal fun validateBackup(backup: BackupEnvelope) {
     require(backup.schemaVersion in 1..6) { "不支持的备份版本 ${backup.schemaVersion}" }
@@ -65,10 +65,12 @@ internal fun validateBackup(backup: BackupEnvelope) {
         }
     }
     backup.settings?.let {
-        require(it.themeMode in setOf("SYSTEM","LIGHT","DARK"))
-        require(it.navigationBarStyle in setOf("STANDARD","FLOATING","LIQUID"))
-        require(it.navigationBarMode in setOf("ICON_AND_TEXT","ICON_ONLY","SELECTED_LABEL"))
-        require(it.floatingNavigationBarPosition in setOf("CENTER","START","END"))
+        require(it.themeMode in setOf("SYSTEM", "LIGHT", "DARK"))
+        require(it.keyColorIndex in 0..7)
+        require(it.paletteStyle in setOf("TonalSpot", "Neutral", "Vibrant", "Expressive", "Rainbow", "FruitSalad", "Monochrome", "Fidelity", "Content", "Cmf"))
+        require(it.colorSpec in setOf("Spec2021", "Spec2025"))
+        require(it.glassMaterialPreset in setOf("DEFAULT", "PURED_THIN", "POPUP_VIEW"))
+        require(it.glassEdgeStroke in setOf("DEFAULT", "SMALL", "MIDDLE", "BIG", "NONE"))
         rest(it.defaultRestSeconds)
     }
 }

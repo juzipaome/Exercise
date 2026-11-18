@@ -19,7 +19,11 @@ require(!keystorePropertiesFile.exists() || missingKeystoreProperties.isEmpty())
 
 android {
     namespace = "com.juzi.lianji"
-    compileSdk = 37
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 2
+        }
+    }
 
     defaultConfig {
         applicationId = "com.juzi.lianji"
@@ -59,7 +63,7 @@ kotlin {
     }
 }
 
-val miuixVersion = "0.9.4"
+val miuixVersion = "0.9.5-beta01"
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 
 dependencies {
@@ -74,22 +78,24 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-compose:3.4.0")
     implementation("io.coil-kt.coil3:coil-gif:3.4.0")
     implementation("top.yukonga.miuix.kmp:miuix-ui:$miuixVersion")
-    implementation("top.yukonga.miuix.kmp:miuix-icons:$miuixVersion")
+    implementation("top.yukonga.miuix.kmp:miuix-glass-icons:$miuixVersion")
     implementation("top.yukonga.miuix.kmp:miuix-preference:$miuixVersion")
     implementation("top.yukonga.miuix.kmp:miuix-squircle:$miuixVersion")
+    implementation("top.yukonga.miuix.kmp:miuix-material:$miuixVersion")
     implementation("top.yukonga.miuix.kmp:miuix-blur:$miuixVersion")
+    implementation("top.yukonga.miuix.kmp:miuix-glass:$miuixVersion")
     implementation("top.yukonga.miuix.kmp:miuix-nav:$miuixVersion")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     testImplementation("org.robolectric:robolectric:4.16.1")
     // Match the Compose version resolved by MIUIX; these are not Release dependencies.
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.12.0-rc01")
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.12.1")
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test:rules:1.7.0")
     // Older transitive Espresso uses InputManager reflection removed in Android 16.
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
-    debugImplementation("androidx.compose.ui:ui-test-manifest:1.12.0-rc01")
+    debugImplementation("androidx.compose.ui:ui-test-manifest:1.12.1")
 }
 
 // Espresso 3.7.0 requires concurrent-futures 1.2.0. Keep AndroidTest

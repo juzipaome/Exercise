@@ -27,6 +27,7 @@ interface PlanRepository {
 
 interface ScheduleRepository {
     fun schedules(fromDate: String, untilDate: String): Flow<List<ScheduledWorkoutEntity>>
+    suspend fun schedule(planId: Long, date: LocalDate): Long
     suspend fun delete(item: ScheduledWorkoutEntity)
 }
 
@@ -139,6 +140,12 @@ class LianJiRepository(private val db: LianJiDatabase) : ExerciseRepository, Pla
     override suspend fun delete(id: Long) = db.planDao().delete(id)
 
     override fun schedules(fromDate: String, untilDate: String) = db.scheduleDao().observeRange(fromDate,untilDate).distinctUntilChanged()
+    override suspend fun schedule(planId: Long, date: LocalDate): Long = db.withTransaction {
+        val plan = db.planDao().getPlan(planId) ?: error("计划不存在")
+        val scheduledDate = date.toString()
+        db.scheduleDao().idForPlanOnDate(planId, scheduledDate)?.let { return@withTransaction it }
+        db.scheduleDao().insert(ScheduledWorkoutEntity(planId = plan.id, planName = plan.name, scheduledDate = scheduledDate))
+    }
     override suspend fun delete(item: ScheduledWorkoutEntity) = db.scheduleDao().delete(item)
 
     override val activeSession = db.sessionDao().observeActive().distinctUntilChanged()
@@ -153,11 +160,11 @@ class LianJiRepository(private val db: LianJiDatabase) : ExerciseRepository, Pla
         db.sessionDao().getActive()?.let { return@withTransaction it.id }
         val plan = db.planDao().getPlan(planId) ?: error("计划不存在")
         val items = db.planDao().getItems(planId)
-        require(items.isNotEmpty()) { "计划里还没有动作" }
+        val resolved = items.mapNotNull { item -> db.exerciseDao().get(item.exerciseId)?.let { item to it } }
+        require(resolved.isNotEmpty()) { "计划里还没有动作" }
         val sessionId = db.sessionDao().insertSession(WorkoutSessionEntity(sourcePlanId = planId, planNameSnapshot = plan.name, startedAt = System.currentTimeMillis(), localDate = LocalDate.now().toString()))
-        items.forEach { item ->
-            val exercise = db.exerciseDao().get(item.exerciseId) ?: return@forEach
-            val sessionExerciseId = db.sessionDao().insertSessionExercise(SessionExerciseEntity(sessionId = sessionId, exerciseId = exercise.id, exerciseNameSnapshot = exercise.nameZh, position = item.position, restSeconds = item.restSeconds, trackingMode = exercise.trackingMode))
+        resolved.forEachIndexed { position, (item, exercise) ->
+            val sessionExerciseId = db.sessionDao().insertSessionExercise(SessionExerciseEntity(sessionId = sessionId, exerciseId = exercise.id, exerciseNameSnapshot = exercise.nameZh, position = position, restSeconds = item.restSeconds, trackingMode = exercise.trackingMode))
             val recordCount = initialRecordCount(exercise,item.defaultSets)
             db.sessionDao().insertSets(List(recordCount) { index -> WorkoutSetEntity(sessionExerciseId = sessionExerciseId, position = index, weightKg = if (exercise.isCardio) 0.0 else item.defaultWeightKg, reps = initialReps(exercise,item.defaultReps)) })
         }
@@ -230,13 +237,19 @@ class LianJiRepository(private val db: LianJiDatabase) : ExerciseRepository, Pla
         }
     } }
     override suspend fun updateCardioValues(id: Long, durationSeconds: Int, distanceKm: Double) { db.sessionDao().updateCardioValues(id,durationSeconds.coerceAtLeast(0),normalizedCardioDistance(distanceKm)) }
-    override suspend fun setSessionRest(sessionId: Long, seconds: Int) { db.sessionDao().updateSessionRest(sessionId,seconds) }
+    override suspend fun setSessionRest(sessionId: Long, seconds: Int) = db.withTransaction {
+        db.sessionDao().updateSessionRestOverride(sessionId, seconds)
+        db.sessionDao().updateSessionRest(sessionId, seconds)
+    }
     override suspend fun addSet(sessionExerciseId: Long, position: Int, weight: Double, reps: Int) { db.sessionDao().insertSet(WorkoutSetEntity(sessionExerciseId=sessionExerciseId,position=position,weightKg=weight,reps=reps)) }
     override suspend fun addExercise(sessionId: Long, exerciseId: String, restSeconds: Int) { db.withTransaction {
-        if (db.sessionDao().getSessionExercises(sessionId).any { it.exerciseId == exerciseId }) return@withTransaction
+        val session = db.sessionDao().getSession(sessionId) ?: return@withTransaction
+        val exercises = db.sessionDao().getSessionExercises(sessionId)
+        if (exercises.any { it.exerciseId == exerciseId }) return@withTransaction
         val exercise = db.exerciseDao().get(exerciseId) ?: return@withTransaction
         val position = db.sessionDao().maxExercisePosition(sessionId) + 1
-        val id = db.sessionDao().insertSessionExercise(SessionExerciseEntity(sessionId=sessionId,exerciseId=exercise.id,exerciseNameSnapshot=exercise.nameZh,position=position,restSeconds=restSeconds,trackingMode=exercise.trackingMode))
+        val sessionRest = session.restSecondsOverride ?: exercises.firstOrNull()?.restSeconds ?: restSeconds
+        val id = db.sessionDao().insertSessionExercise(SessionExerciseEntity(sessionId=sessionId,exerciseId=exercise.id,exerciseNameSnapshot=exercise.nameZh,position=position,restSeconds=sessionRest,trackingMode=exercise.trackingMode))
         val recordCount = initialRecordCount(exercise,3)
         db.sessionDao().insertSets(List(recordCount) { index -> WorkoutSetEntity(sessionExerciseId=id,position=index,weightKg=0.0,reps=initialReps(exercise,10)) })
     } }
@@ -260,11 +273,16 @@ class LianJiRepository(private val db: LianJiDatabase) : ExerciseRepository, Pla
     override suspend fun finish(id: Long): Boolean = db.withTransaction {
         val now = System.currentTimeMillis()
         db.sessionDao().closeOpenRests(id,now)
+        db.sessionDao().getRunningSetsExcept(id,-1L).forEach { running ->
+            db.sessionDao().updateSet(running.copy(pausedAt = now))
+        }
         val session = db.sessionDao().getSession(id) ?: return@withTransaction false
         db.sessionDao().updateSession(session.copy(endedAt = now, status = "COMPLETED"))
         val sourcePlanId = session.sourcePlanId ?: return@withTransaction false
-        val planItems = db.planDao().getItems(sourcePlanId)
+        if (db.planDao().getPlan(sourcePlanId) == null) return@withTransaction false
         val exercises = db.sessionDao().getSessionExercises(id)
+        if (exercises.isEmpty()) return@withTransaction false
+        val planItems = db.planDao().getItems(sourcePlanId)
         val recordCounts = exercises.associate { it.id to db.sessionDao().getSetsForExercise(it.id).size }
         hasPlanStructureChanges(planItems,exercises,recordCounts)
     }
@@ -277,6 +295,7 @@ class LianJiRepository(private val db: LianJiDatabase) : ExerciseRepository, Pla
             val sample = sets.firstOrNull()
             PlanExerciseEntity(planId=plan.id,exerciseId=exercise.exerciseId,position=exercise.position,defaultSets=sets.size.coerceAtLeast(1),defaultReps=sample?.reps ?: 10,defaultWeightKg=sample?.weightKg ?: 0.0,restSeconds=exercise.restSeconds)
         }
+        require(items.isNotEmpty()) { "没有可保存为计划的动作" }
         save(plan, items)
     }
     override suspend fun addPastWorkout(planId: Long, exerciseIds: List<String>, date: LocalDate, startMinute: Int, endMinute: Int, cardioDistancesKm: Map<String, Double>, cardioDurationsSeconds: Map<String, Int>): Long = db.withTransaction {
@@ -291,6 +310,7 @@ class LianJiRepository(private val db: LianJiDatabase) : ExerciseRepository, Pla
         val selectedItems = db.planDao().getItems(planId).filter { it.exerciseId in selected }.mapNotNull { item ->
             db.exerciseDao().get(item.exerciseId)?.let { exercise -> item to exercise }
         }
+        require(selectedItems.isNotEmpty()) { "至少选择一个有效动作" }
         val cardioIds = selectedItems.filter { (_, exercise) -> exercise.isCardio }.map { (_, exercise) -> exercise.id }
         require(cardioIds.all { id -> cardioDistancesKm[id]?.let { it.isFinite() && it >= 0.0 } != false }) { "有氧距离必须是有限的非负数" }
         if (cardioIds.size > 1) require(cardioIds.all(cardioDurationsSeconds::containsKey)) { "多个有氧动作需要分别填写时长" }

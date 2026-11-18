@@ -1,6 +1,7 @@
 package com.juzi.lianji.data
 
 import android.content.Context
+import androidx.core.content.edit
 import androidx.room.withTransaction
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -61,7 +62,7 @@ object ExerciseImporter {
                 item.copy(nameZh=previous?.nameZh?.takeIf{_->previous.nameZh!=previous.datasetNameZh}?:item.nameZh,isFavorite=previous?.isFavorite?:false)
             })
         }
-        preferences.edit().putString("signature",signature).apply()
+        preferences.edit { putString("signature", signature) }
     } }
 
     private fun SourceExercise.toEntity(

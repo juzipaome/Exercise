@@ -1,12 +1,17 @@
 package com.juzi.lianji
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.activity.compose.LocalActivity
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.*
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.test.platform.app.InstrumentationRegistry
@@ -20,6 +25,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.*
 import org.junit.Assert.*
+import java.io.File
 import java.time.YearMonth
 
 class UiRegressionTest {
@@ -31,12 +37,13 @@ class UiRegressionTest {
     @Before fun open() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         db = Room.inMemoryDatabaseBuilder(instrumentation.targetContext, LianJiDatabase::class.java).build()
+        val settingsDir = File(instrumentation.targetContext.cacheDir, "ui-regression")
         val testContext = object : ContextWrapper(instrumentation.context) {
             override fun getApplicationContext(): Context = this
+            override fun getFilesDir(): File = settingsDir
         }
         val app = LianJiApplication().apply {
             repository = LianJiRepository(db)
-            // Settings are stored under the test APK, not the installed app's files.
             settingsStore = SettingsStore(testContext)
             backupManager = BackupManager(testContext, db, settingsStore)
         }
@@ -131,6 +138,163 @@ class UiRegressionTest {
         val target=runBlocking { vm.repository.rows(sessionId).first()[8].exerciseId }
         dragToEdge(target,true)
         compose.waitUntil(10_000) { runBlocking { vm.repository.rows(sessionId).first().indexOfFirst{it.exerciseId==target}>10 } }
+    }
+
+    @Test fun long_pressing_topmost_card_with_upward_jitter_does_not_rapidly_scroll_neighbors() {
+        val sessionId=workout((0..15).map { "TopHold$it" })
+        compose.setContent { LianJiTheme(AppSettings(dynamicColor=false)) { WorkoutScreen(vm,sessionId,{},{},{}) } }
+        awaitText("TopHold0")
+        val list=compose.onNodeWithTag("workout-exercises")
+        list.performScrollToIndex(5)
+        compose.waitForIdle()
+        val before=card("TopHold5").fetchSemanticsNode().boundsInRoot
+        val neighbor=card("TopHold6").fetchSemanticsNode().boundsInRoot
+        val origin=list.fetchSemanticsNode().boundsInRoot.topLeft
+        val start=Offset(before.left+30f,before.top+18f)-origin
+        compose.mainClock.autoAdvance=false
+        list.performTouchInput { down(start); advanceEventTime(600); moveTo(start) }
+        compose.mainClock.advanceTimeBy(200)
+        list.performTouchInput { moveTo(Offset(start.x,(start.y-20f).coerceAtLeast(2f)),100) }
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
+        assertEquals("Long-pressing topmost card with upward jitter caused rapid neighbor scroll",neighbor.top,card("TopHold6").fetchSemanticsNode().boundsInRoot.top,2f)
+        val clearY=with(compose.density) { 64.dp.toPx() }
+        list.performTouchInput { moveTo(Offset(start.x,clearY),100) }
+        compose.mainClock.advanceTimeBy(100)
+        list.performTouchInput { moveTo(Offset(start.x,6f),100) }
+        compose.mainClock.advanceTimeBy(2_000)
+        compose.waitForIdle()
+        list.performTouchInput { up() }
+        compose.mainClock.autoAdvance=true
+        compose.waitUntil(10_000) { runBlocking { vm.repository.rows(sessionId).first().indexOfFirst{it.exerciseId=="TopHold5"}<5 } }
+    }
+
+    @Test fun dragging_top_card_downward_in_upper_half_never_scrolls_to_bottom() {
+        val sessionId=workout((0..15).map { "UpperDrag$it" })
+        compose.setContent { LianJiTheme(AppSettings(dynamicColor=false)) { WorkoutScreen(vm,sessionId,{},{},{}) } }
+        awaitText("UpperDrag0")
+        val list=compose.onNodeWithTag("workout-exercises")
+        val origin=list.fetchSemanticsNode().boundsInRoot.topLeft
+        val viewportHeight=list.fetchSemanticsNode().boundsInRoot.height
+        val upperLimit=(viewportHeight*0.45f)
+
+        // 1. Fast downward drag of UpperDrag0 within the upper half of the viewport
+        val before0=card("UpperDrag0").fetchSemanticsNode().boundsInRoot
+        val neighbor1=card("UpperDrag1").fetchSemanticsNode().boundsInRoot
+        val start0=Offset(before0.left+30f,before0.top+24f)-origin
+        val targetDelta0=(before0.height*1.2f).coerceAtMost(upperLimit-start0.y)
+        compose.mainClock.autoAdvance=false
+        list.performTouchInput { down(start0); advanceEventTime(600); moveTo(start0) }
+        compose.mainClock.advanceTimeBy(100)
+        list.performTouchInput { moveTo(start0+Offset(0f,targetDelta0),50) }
+        compose.mainClock.advanceTimeBy(1_200)
+        compose.waitForIdle()
+        assertEquals("Viewport jumped when dragging top card fast",before0.top,card("UpperDrag1").fetchSemanticsNode().boundsInRoot.top,2f)
+        assertTrue("List scrolled all the way to the bottom!",compose.onAllNodesWithText("UpperDrag15").fetchSemanticsNodes().isEmpty())
+        list.performTouchInput { up() }
+        compose.mainClock.autoAdvance=true
+        compose.waitUntil(10_000) { runBlocking { vm.repository.rows(sessionId).first()[1].exerciseId=="UpperDrag0" } }
+
+        // 2. Slow incremental downward drag of the new top card (UpperDrag1) in the upper half
+        val before1=card("UpperDrag1").fetchSemanticsNode().boundsInRoot
+        val start1=Offset(before1.left+30f,before1.top+24f)-origin
+        val slowTotal=(neighbor1.height+before1.height*0.3f).coerceAtMost(upperLimit-start1.y)
+        compose.mainClock.autoAdvance=false
+        list.performTouchInput { down(start1); advanceEventTime(600); moveTo(start1) }
+        compose.mainClock.advanceTimeBy(100)
+        val steps=25
+        repeat(steps) { step ->
+            val y=start1.y+slowTotal*(step+1)/steps
+            list.performTouchInput { moveTo(Offset(start1.x,y),32) }
+            compose.mainClock.advanceTimeBy(32)
+        }
+        compose.mainClock.advanceTimeBy(1_200)
+        compose.waitForIdle()
+        assertEquals("Viewport jumped during slow downward drag",before1.top,card("UpperDrag0").fetchSemanticsNode().boundsInRoot.top,2f)
+        assertTrue("List scrolled to bottom during slow drag!",compose.onAllNodesWithText("UpperDrag15").fetchSemanticsNodes().isEmpty())
+        list.performTouchInput { up() }
+        compose.mainClock.autoAdvance=true
+        compose.waitUntil(10_000) {
+            val idx=runBlocking { vm.repository.rows(sessionId).first().indexOfFirst { it.exerciseId=="UpperDrag1" } }
+            idx in 1..2
+        }
+    }
+
+    @Test fun workout_top_menu_opens_rest_settings_and_add_exercise() {
+        val sessionId = workout(listOf("MenuExercise"))
+        compose.setContent { LianJiApp(vm, requestedWorkoutId = sessionId) }
+        awaitText("MenuExercise")
+        val more = compose.onNodeWithContentDescription("更多训练功能")
+
+        more.performTouchInput { click() }
+        compose.onNodeWithText("调整休息时间").assertIsDisplayed().performTouchInput { click() }
+        awaitText("本次组间休息")
+        compose.onNodeWithText("取消").performClick()
+
+        more.performTouchInput { click() }
+        compose.onNodeWithText("添加动作").assertIsDisplayed().performTouchInput { click() }
+        awaitText("训练中添加动作")
+    }
+
+    @Test fun appearance_settings_open_on_a_separate_page_and_save_theme_selection() {
+        val originalMode = runBlocking { vm.settingsStore.settings.first().themeMode }
+        lateinit var activity: Activity
+        try {
+            runBlocking { vm.settingsStore.setTheme("LIGHT") }
+            compose.setContent {
+                val host = checkNotNull(LocalActivity.current)
+                SideEffect { activity = host }
+                LianJiApp(vm)
+            }
+            fun assertLightSystemBars(expected: Boolean) = compose.runOnIdle {
+                val window = activity.window
+                val bars = WindowCompat.getInsetsController(window, window.decorView)
+                assertEquals(expected, bars.isAppearanceLightStatusBars)
+                assertEquals(expected, bars.isAppearanceLightNavigationBars)
+            }
+            assertLightSystemBars(true)
+            compose.onNodeWithText("设置").performClick()
+            awaitText("外观")
+            compose.onNodeWithText("深浅模式").assertDoesNotExist()
+            compose.onNodeWithText("外观").performClick()
+            awaitText("深浅模式")
+            compose.onNodeWithText("深浅模式").performClick()
+            compose.onNodeWithText("深色主题").assertIsDisplayed().performTouchInput { click() }
+            compose.waitUntil(10_000) { runBlocking { vm.settingsStore.settings.first().themeMode == "DARK" } }
+            assertLightSystemBars(false)
+            compose.onNodeWithContentDescription("返回").performClick()
+            compose.onNodeWithText("默认组间休息").assertIsDisplayed()
+        } finally {
+            runBlocking { vm.settingsStore.setTheme(originalMode) }
+        }
+    }
+
+    @Test fun main_create_actions_move_between_the_bottom_and_top_bars_without_duplicates() {
+        val original = runBlocking { vm.settingsStore.settings.first().navigationBarAction }
+        try {
+            runBlocking { vm.settingsStore.setNavigationBarAction(true) }
+            compose.setContent { LianJiApp(vm) }
+            val createPlan = compose.onNodeWithContentDescription("创建计划")
+            val bottomPlanY = createPlan.fetchSemanticsNode().boundsInRoot.center.y
+            createPlan.performClick()
+            awaitText("计划名称")
+            compose.onNodeWithContentDescription("返回").performClick()
+
+            compose.onNodeWithText("动作库").performClick()
+            val createExercise = compose.onNodeWithContentDescription("自定义动作")
+            val bottomExerciseY = createExercise.fetchSemanticsNode().boundsInRoot.center.y
+            createExercise.performClick()
+            awaitText("动作名称")
+            compose.onNodeWithContentDescription("返回").performClick()
+
+            runBlocking { vm.settingsStore.setNavigationBarAction(false) }
+            compose.waitUntil(10_000) { !vm.state.value.settings.navigationBarAction }
+            assertTrue(createExercise.fetchSemanticsNode().boundsInRoot.center.y < bottomExerciseY)
+            compose.onNodeWithText("运动").performClick()
+            assertTrue(createPlan.fetchSemanticsNode().boundsInRoot.center.y < bottomPlanY)
+        } finally {
+            runBlocking { vm.settingsStore.setNavigationBarAction(original) }
+        }
     }
 
     @Test fun deleting_trained_set_confirms_and_last_set_requires_explicit_card_deletion() {

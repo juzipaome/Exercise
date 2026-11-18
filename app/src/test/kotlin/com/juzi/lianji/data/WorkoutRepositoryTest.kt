@@ -59,6 +59,20 @@ class WorkoutRepositoryTest {
         assertTrue(saved.completed); assertEquals(32.5,saved.weightKg,0.0); assertEquals(8,saved.reps)
     }
 
+    @Test fun added_exercises_inherit_session_rest_even_after_removing_all_exercises() = runBlocking {
+        val id = repository.start(plan())
+        repository.setSessionRest(id, 30)
+        val exercises = db.sessionDao().getSessionExercises(id)
+        assertTrue(exercises.all { it.restSeconds == 30 })
+        repository.deleteExercise(exercises.last().id, confirmed = true)
+        repository.addExercise(id, "b", 90)
+        assertEquals(30, db.sessionDao().getSessionExercises(id).last().restSeconds)
+
+        db.sessionDao().getSessionExercises(id).forEach { repository.deleteExercise(it.id, confirmed = true) }
+        repository.addExercise(id, "a", 90)
+        assertEquals(30, db.sessionDao().getSessionExercises(id).single().restSeconds)
+    }
+
     @Test fun trained_sets_require_confirmation_and_concurrent_deletes_keep_one_set()= runBlocking {
         val plan=plan(); val id=repository.start(plan)
         val a=repository.rows(id).first().first()
@@ -182,5 +196,29 @@ class WorkoutRepositoryTest {
         assertEquals(30.0,repository.personalBest("a").first()!!.maxWeightKg,0.0)
         assertEquals(100.0,repository.personalBest("b").first()!!.maxWeightKg,0.0)
         assertNull(repository.personalBest("unknown").first())
+    }
+
+    @Test fun finishing_after_source_plan_deletion_skips_plan_prompt_and_freezes_running_set()= runBlocking {
+        val planId=plan()
+        val sessionId=repository.start(planId)
+        val firstSetId=repository.rows(sessionId).first().first().setId
+        repository.beginSet(firstSetId)
+        assertNull(db.sessionDao().getSet(firstSetId)!!.pausedAt)
+        repository.delete(planId)
+        val hasChanges=repository.finish(sessionId)
+        assertFalse(hasChanges)
+        assertNotNull(db.sessionDao().getSet(firstSetId)!!.pausedAt)
+        assertEquals("COMPLETED",db.sessionDao().getSession(sessionId)!!.status)
+    }
+
+    @Test fun scheduling_plan_is_idempotent_per_plan_and_date()= runBlocking {
+        val planId=plan()
+        val date=java.time.LocalDate.of(2026,12,1)
+        val first=repository.schedule(planId,date)
+        val second=repository.schedule(planId,date)
+        assertEquals(first,second)
+        val schedules=repository.schedules("2026-12-01","2026-12-02").first()
+        assertEquals(1,schedules.size)
+        assertEquals("PLANNED",repository.days("2026-12-01","2026-12-02").first().single().status)
     }
 }

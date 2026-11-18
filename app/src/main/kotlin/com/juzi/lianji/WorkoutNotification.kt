@@ -16,6 +16,7 @@ import android.graphics.Paint
 import android.graphics.Shader
 import android.graphics.drawable.Icon
 import android.os.Bundle
+import androidx.core.graphics.createBitmap
 import com.juzi.lianji.data.SessionSetRow
 import com.juzi.lianji.data.TrackingMode
 import com.juzi.lianji.data.WorkoutRepository
@@ -249,7 +250,7 @@ internal fun decodeWorkoutPicture(open: () -> java.io.InputStream): Bitmap? {
     return open().use { BitmapFactory.decodeStream(it,null,options) }?.let(::roundedPicture)
 }
 
-private fun roundedPicture(source: Bitmap): Bitmap = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888).also { result ->
+private fun roundedPicture(source: Bitmap): Bitmap = createBitmap(source.width, source.height).also { result ->
     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = BitmapShader(source, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP) }
     Canvas(result).drawRoundRect(0f, 0f, source.width.toFloat(), source.height.toFloat(), minOf(source.width, source.height) / 4f, minOf(source.width, source.height) / 4f, paint)
 }

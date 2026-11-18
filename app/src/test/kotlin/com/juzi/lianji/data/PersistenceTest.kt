@@ -31,13 +31,14 @@ class PersistenceTest {
             old.execSQL("INSERT INTO workout_sets (id,sessionExerciseId,position,weightKg,reps,completed,startedAt) VALUES (1,1,0,30,10,0,NULL),(2,2,0,40,8,0,2100)")
             old.version=5
         }
-        val db=Room.databaseBuilder(context,LianJiDatabase::class.java,name).addMigrations(LianJiDatabase.MIGRATION_5_6).build()
+        val db=Room.databaseBuilder(context,LianJiDatabase::class.java,name).addMigrations(LianJiDatabase.MIGRATION_5_6,LianJiDatabase.MIGRATION_6_7).build()
         try {
             val rows=db.sessionDao().observeRows(2).first()
             assertEquals(listOf("b","a"),rows.map { it.exerciseId })
             assertEquals(2,db.sessionDao().getSessionExercises(2).size)
             assertEquals("INTERRUPTED",db.sessionDao().getSession(1)!!.status)
             assertEquals(2L,db.sessionDao().getActive()!!.id)
+            assertNull(db.sessionDao().getActive()!!.restSecondsOverride)
             assertEquals(40.0,rows.first().weightKg,0.0)
             assertNull(rows.first().restNotifiedAt)
             db.sessionDao().recordImport(ImportedBackupEntity("test",1))
@@ -58,12 +59,12 @@ class PersistenceTest {
             val plan=repository.save(WorkoutPlanEntity(name="Test"),listOf(PlanExerciseEntity(planId=0,exerciseId=exercise.id,position=0,defaultSets=1)))
             repository.start(plan)
             val settings=SettingsStore(context)
-            settings.setNavigationBarStyle("LIQUID")
+            settings.setGlassMaterialPreset("POPUP_VIEW")
             BackupManager(context,db,settings).exportTo(Uri.fromFile(file))
             val raw=file.readText()
-            val envelope=Json.decodeFromString<BackupEnvelope>(raw)
+            val envelope=backupJson.decodeFromString<BackupEnvelope>(raw)
             validateBackup(envelope)
-            settings.setNavigationBarStyle("STANDARD")
+            settings.setGlassMaterialPreset("DEFAULT")
             val backup=BackupManager(context,target,settings)
             ExerciseImporter.seedIfNeeded(context,target)
             val targetOnlyFavorite=target.exerciseDao().getBuiltin().first { it.id!=exercise.id }
@@ -76,7 +77,7 @@ class PersistenceTest {
             assertNull(target.sessionDao().getActive())
             assertTrue(target.exerciseDao().get(exercise.id)!!.isFavorite)
             assertFalse(target.exerciseDao().get(targetOnlyFavorite.id)!!.isFavorite)
-            assertEquals("LIQUID",settings.settings.first().navigationBarStyle)
+            assertEquals("POPUP_VIEW",settings.settings.first().glassMaterialPreset)
             file.writeText(Json.encodeToString(envelope.copy(plans=envelope.plans.map { it.copy(items=it.items.map { item->item.copy(defaultSets=-1) }) })))
             try { backup.importFrom(Uri.fromFile(file)); fail("Invalid backup accepted") }
             catch (_: IllegalArgumentException) { }

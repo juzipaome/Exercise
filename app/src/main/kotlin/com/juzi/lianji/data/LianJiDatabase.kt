@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [ExerciseEntity::class, WorkoutPlanEntity::class, PlanExerciseEntity::class, ScheduledWorkoutEntity::class, WorkoutSessionEntity::class, SessionExerciseEntity::class, WorkoutSetEntity::class, ImportedBackupEntity::class],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class LianJiDatabase : RoomDatabase() {
@@ -71,6 +71,11 @@ abstract class LianJiDatabase : RoomDatabase() {
                 db.execSQL("UPDATE workout_sessions SET status='INTERRUPTED', endedAt=COALESCE(endedAt,?) WHERE status='ACTIVE' AND id!=(SELECT id FROM workout_sessions WHERE status='ACTIVE' ORDER BY startedAt DESC, id DESC LIMIT 1)", arrayOf<Any>(System.currentTimeMillis()))
             }
         }
-        fun create(context: Context) = Room.databaseBuilder(context, LianJiDatabase::class.java, "lianji.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE workout_sessions ADD COLUMN restSecondsOverride INTEGER")
+            }
+        }
+        fun create(context: Context) = Room.databaseBuilder(context, LianJiDatabase::class.java, "lianji.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build()
     }
 }

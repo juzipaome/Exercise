@@ -1,6 +1,5 @@
 package com.juzi.lianji.ui
 
-import android.app.Activity
 import android.content.pm.PackageManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -13,11 +12,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
@@ -28,18 +25,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.view.WindowInsetsControllerCompat
 import com.juzi.lianji.R
 import top.yukonga.miuix.kmp.basic.*
-import top.yukonga.miuix.kmp.blur.BlendColorEntry
-import top.yukonga.miuix.kmp.blur.BlurBlendMode
-import top.yukonga.miuix.kmp.blur.BlurDefaults
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
-import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
-import top.yukonga.miuix.kmp.blur.textureBlur
+import top.yukonga.miuix.kmp.glass.GlassTopAppBar
+import top.yukonga.miuix.kmp.glass.GlassTopAppBarDefaults
+import top.yukonga.miuix.kmp.glass.glassPanel
 import top.yukonga.miuix.kmp.interfaces.ExperimentalScrollBarApi
+import top.yukonga.miuix.kmp.material.GlassEdgeStrokes
+import top.yukonga.miuix.kmp.material.GlassMaterials
+import top.yukonga.miuix.kmp.material.GlassShape
+import top.yukonga.miuix.kmp.material.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -54,32 +52,23 @@ fun AboutScreen(onBack:()->Unit) {
     val scrollProgress by remember { derivedStateOf { if(listState.firstVisibleItemIndex>0)1f else (listState.firstVisibleItemScrollOffset/collapseDistance).coerceIn(0f,1f) } }
     val surface=MiuixTheme.colorScheme.surface
     val dark=surface.luminance()<.5f
-    DisposableEffect(dark){
-        val window=(context as? Activity)?.window
-        val controller=window?.let { WindowInsetsControllerCompat(it,it.decorView) }
-        val oldLightStatus=controller?.isAppearanceLightStatusBars
-        val oldLightNavigation=controller?.isAppearanceLightNavigationBars
-        controller?.isAppearanceLightStatusBars=!dark
-        controller?.isAppearanceLightNavigationBars=!dark
-        onDispose {
-            if(oldLightStatus!=null)controller.isAppearanceLightStatusBars=oldLightStatus
-            if(oldLightNavigation!=null)controller.isAppearanceLightNavigationBars=oldLightNavigation
-        }
-    }
+    val settings = LocalMiuixFeatureSettings.current
     val backdrop=if(isRuntimeShaderSupported())rememberLayerBackdrop{drawRect(surface);drawContent()}else null
-    val collapsed=scrollProgress==1f
     val version=remember(context){context.packageManager.getPackageInfo(context.packageName,PackageManager.PackageInfoFlags.of(0)).versionName?:"0.2.0"}
 
     Scaffold(topBar={
-        Box(modifier=if(backdrop!=null&&collapsed)Modifier.textureBlur(backdrop,RectangleShape,25f,colors=BlurDefaults.blurColors(blendColors=listOf(BlendColorEntry(surface.copy(alpha=.8f)))))else Modifier){
-            SmallTopAppBar(
-                title="关于",
-                titleColor=MiuixTheme.colorScheme.onSurface.copy(alpha=((scrollProgress-.35f)/.65f).coerceIn(0f,1f)),
-                color=if(collapsed&&backdrop==null)surface else Color.Transparent,
-                scrollBehavior=scrollBehavior,
-                navigationIcon={BackButton(onBack)},
-            )
-        }
+        GlassTopAppBar(
+            title="关于",
+            expandable=false,
+            progressiveBlur=settings.progressiveBlur && backdrop != null,
+            backdrop=backdrop,
+            scrollBehavior=scrollBehavior,
+            style=rememberOs4GlassStyle(),
+            material=rememberOs4CustomMaterial() ?: GlassTopAppBarDefaults.buttonMaterial(),
+            stroke=rememberOs4EdgeStroke(GlassTopAppBarDefaults.buttonStroke()),
+            titleAlpha={((scrollProgress-.35f)/.65f).coerceIn(0f,1f)},
+            navigationIcon={BackButton(onBack)},
+        )
     }){padding->
         Box(Modifier.fillMaxSize()){
             AboutBackground(
@@ -89,8 +78,8 @@ fun AboutScreen(onBack:()->Unit) {
             )
             LazyColumn(
                 state=listState,
-                modifier=Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
-                contentPadding=PaddingValues(top=padding.calculateTopPadding()+40.dp,bottom=padding.calculateBottomPadding()+24.dp),
+                modifier=Modifier.fillMaxSize().os4ScrollModifiers(scrollBehavior),
+                contentPadding = padding.withPageSpacing(top = 40.dp),
             ){
                 item(key="identity"){
                     Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally){
@@ -111,7 +100,7 @@ fun AboutScreen(onBack:()->Unit) {
                 item(key="sources"){
                     AboutGlassCard(backdrop,dark){
                         ArrowPreference(title="动作数据",summary="hasaneyldrm/exercises-dataset",endActions={AboutValue("MIT")},onClick={uriHandler.openUri("https://github.com/hasaneyldrm/exercises-dataset")})
-                        ArrowPreference(title="界面框架",summary="Miuix for Compose",endActions={AboutValue("0.9.4")},onClick={uriHandler.openUri("https://github.com/compose-miuix-ui/miuix")})
+                        ArrowPreference(title="界面框架",summary="Miuix for Compose",endActions={AboutValue("0.9.5-beta01")},onClick={uriHandler.openUri("https://github.com/compose-miuix-ui/miuix")})
                     }
                 }
                 item(key="privacy"){
@@ -130,22 +119,25 @@ fun AboutScreen(onBack:()->Unit) {
 
 @Composable
 private fun AboutGlassCard(backdrop:LayerBackdrop?,dark:Boolean,content:@Composable ColumnScope.()->Unit) {
-    val modifier=if(backdrop==null)Modifier else Modifier.textureBlur(
-        backdrop=backdrop,
-        shape=RoundedCornerShape(16.dp),
-        blurRadius=60f,
-        colors=BlurDefaults.blurColors(blendColors=if(dark)listOf(
-            BlendColorEntry(Color(0x4DA9A9A9),BlurBlendMode.Luminosity),
-            BlendColorEntry(Color(0x1A9C9C9C),BlurBlendMode.PlusDarker),
-        )else listOf(
-            BlendColorEntry(Color(0x340034F9),BlurBlendMode.Overlay),
-            BlendColorEntry(Color(0xB3FFFFFF),BlurBlendMode.HardLight),
-        )),
-    )
+    val shape = GlassShape(24.dp)
+    val style = rememberOs4GlassStyle()
+    val material = rememberOs4CustomMaterial() ?: GlassMaterials.puredThinGlass(dark)
+    val stroke = rememberOs4EdgeStroke(GlassEdgeStrokes.forTheme(dark))
     Card(
-        modifier=Modifier.padding(horizontal=12.dp).then(modifier),
-        colors=CardDefaults.defaultColors(if(backdrop!=null)Color.Transparent else MiuixTheme.colorScheme.surfaceContainer,Color.Transparent),
-        content=content,
+        modifier = Modifier
+            .padding(horizontal = 12.dp)
+            .glassPanel(
+                backdrop = backdrop,
+                shape = shape,
+                style = style,
+                material = material,
+                stroke = stroke,
+                shading = false,
+                fallback = Modifier.clip(shape).background(MiuixTheme.colorScheme.surfaceContainer),
+            ),
+        cornerRadius = 24.dp,
+        colors = CardDefaults.defaultColors(Color.Transparent, Color.Transparent),
+        content = content,
     )
 }
 

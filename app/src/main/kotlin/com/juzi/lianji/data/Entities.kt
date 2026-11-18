@@ -76,6 +76,7 @@ data class WorkoutSessionEntity(
     val endedAt: Long? = null,
     val localDate: String,
     val status: String = "ACTIVE",
+    val restSecondsOverride: Int? = null,
 )
 
 @Entity(

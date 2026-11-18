@@ -31,8 +31,10 @@ data class BackupEnvelope(
 @Serializable data class SessionExerciseDto(val id:Long,val exerciseId:String,val name:String,val position:Int,val restSeconds:Int,val sets:List<SetDto>,val trackingMode:String=TrackingMode.STRENGTH)
 @Serializable data class SetDto(val id:Long,val position:Int,val weightKg:Double,val reps:Int,val completed:Boolean,val startedAt:Long?=null,val completedAt:Long?=null,val durationSeconds:Int=0,val restStartedAt:Long?=null,val restEndedAt:Long?=null,val restDurationSeconds:Int=0,val distanceKm:Double=0.0,val pausedAt:Long?=null,val pausedDurationMillis:Long=0)
 
+internal val backupJson = Json { prettyPrint = true; ignoreUnknownKeys = true; encodeDefaults = true }
+
 class BackupManager(private val context: Context, private val db: LianJiDatabase, private val settingsStore: SettingsStore) {
-    private val json = Json { prettyPrint = true; ignoreUnknownKeys = false; encodeDefaults = true }
+    private val json = backupJson
 
     suspend fun exportTo(uri: Uri) = withContext(Dispatchers.IO) {
         val settings = settingsStore.settings.first()
