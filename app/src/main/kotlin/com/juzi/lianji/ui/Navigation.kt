@@ -54,6 +54,7 @@ fun BackButton(onClick: () -> Unit) {
 
 @Composable
 fun PreviousButton(onClick: () -> Unit) {
+    val layoutDirection = LocalLayoutDirection.current
     GlassIconButton(
         onClick = onClick,
         size = 40.dp,
@@ -64,7 +65,9 @@ fun PreviousButton(onClick: () -> Unit) {
         Icon(
             imageVector = MiuixIcons.Glass.ChevronBackward,
             contentDescription = "上月",
-            modifier = Modifier.size(24.dp),
+            modifier = Modifier.size(24.dp).graphicsLayer {
+                if (layoutDirection == LayoutDirection.Rtl) scaleX = -1f
+            },
             tint = MiuixTheme.colorScheme.onSurface,
         )
     }
@@ -72,6 +75,7 @@ fun PreviousButton(onClick: () -> Unit) {
 
 @Composable
 fun NextButton(onClick: () -> Unit) {
+    val layoutDirection = LocalLayoutDirection.current
     GlassIconButton(
         onClick = onClick,
         size = 40.dp,
@@ -82,7 +86,9 @@ fun NextButton(onClick: () -> Unit) {
         Icon(
             imageVector = MiuixIcons.Glass.ChevronForward,
             contentDescription = "下月",
-            modifier = Modifier.size(24.dp),
+            modifier = Modifier.size(24.dp).graphicsLayer {
+                if (layoutDirection == LayoutDirection.Rtl) scaleX = -1f
+            },
             tint = MiuixTheme.colorScheme.onSurface,
         )
     }

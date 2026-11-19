@@ -243,8 +243,22 @@ fun CustomExerciseScreen(vm:MainViewModel,onBack:()->Unit){
     val scope=rememberCoroutineScope()
     var saving by remember{mutableStateOf(false)}
     val surfaceColor = MiuixTheme.colorScheme.surface
-    MiuixPageScaffold(title="自定义动作",navigationIcon={BackButton(onBack)}){pad->
-        Column(Modifier.fillMaxSize().padding(pad).consumeWindowInsets(pad).imePadding().verticalScroll(rememberScrollState()).padding(12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+    val scrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
+    MiuixPageScaffold(
+        title = "自定义动作",
+        navigationIcon = { BackButton(onBack) },
+        scrollBehavior = scrollBehavior,
+    ) { pad ->
+        Column(
+            modifier = Modifier.fillMaxSize()
+                .consumeWindowInsets(pad)
+                .imePadding()
+                .os4ScrollModifiers(scrollBehavior)
+                .verticalScroll(rememberScrollState())
+                .padding(pad)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             TextField(name,{name=it},label="动作名称")
             Text("记录方式",style=MiuixTheme.textStyles.title3)
             GlassSegmentedTabRow(

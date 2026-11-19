@@ -95,6 +95,8 @@ fun WorkoutScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit,onAddExercise:
     val currentRest = session?.restSecondsOverride ?: rows.firstOrNull()?.restSeconds ?: state.settings.defaultRestSeconds
     val dragHaptics=LocalHapticFeedback.current
     val layoutDirection = LocalLayoutDirection.current
+    val listSpacing = 12.dp
+    val listSpacingPx = with(LocalDensity.current) { listSpacing.roundToPx() }
     val dragEdgePx=with(LocalDensity.current){36.dp.toPx()}
     val maxDragScrollPxPerSecond=with(LocalDensity.current){280.dp.toPx()}
     val dragSlop=LocalViewConfiguration.current.touchSlop
@@ -190,12 +192,13 @@ fun WorkoutScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit,onAddExercise:
             val frame=withFrameNanos{it}
             val elapsedSeconds=((frame-previousFrame).coerceAtMost(50_000_000L))/1_000_000_000f
             previousFrame=frame
-            // Pointer coordinates are relative to the viewport, not LazyColumn's content padding.
             val layout=workoutListState.layoutInfo
+            // The list draws behind the top bar, but drag scrolling starts below it.
+            val top = layout.beforeContentPadding - listSpacingPx
             val height=layout.viewportSize.height.toFloat()
             val velocityPxPerSec=when{
-                topEdgeArmed && workoutListState.canScrollBackward && dragPointerY < dragEdgePx -> {
-                    val depth=((dragEdgePx-dragPointerY)/dragEdgePx).coerceIn(0f,1f)
+                topEdgeArmed && workoutListState.canScrollBackward && dragPointerY < top+dragEdgePx -> {
+                    val depth=((top+dragEdgePx-dragPointerY)/dragEdgePx).coerceIn(0f,1f)
                     -maxDragScrollPxPerSecond*depth*depth
                 }
                 bottomEdgeArmed && workoutListState.canScrollForward && dragPointerY > height-dragEdgePx -> {
@@ -210,7 +213,7 @@ fun WorkoutScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit,onAddExercise:
                 val current=index?.let{idx->layout.visibleItemsInfo.firstOrNull{it.key=="exercise-$draggingExerciseId" && it.index==idx}}
                 if(current!=null){
                     // Swap before the dragged card's slot can scroll out of visibleItemsInfo and get recycled.
-                    if(delta>0f && index+1<reorderGroups.size && current.offset+current.size-delta <= layout.viewportStartOffset+4f){
+                    if(delta>0f && index+1<reorderGroups.size && current.offset+current.size-delta <= layout.viewportStartOffset+top+4f){
                         swapDraggedCard(index,index+1)
                     } else if(delta<0f && index>0 && current.offset-delta >= layout.viewportEndOffset-4f){
                         swapDraggedCard(index,index-1)
@@ -287,17 +290,19 @@ fun WorkoutScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit,onAddExercise:
                 Modifier.fillMaxSize()
                     .padding(
                         start = pad.calculateStartPadding(layoutDirection),
-                        top = pad.calculateTopPadding(),
                         end = pad.calculateEndPadding(layoutDirection),
                     )
                     .consumeWindowInsets(pad)
                     .imePadding(),
             ) {
-                val positioningTail = maxOf(maxHeight * .62f, pad.calculateBottomPadding() + 24.dp)
+                val topPadding = pad.calculateTopPadding()
+                val positioningTail = maxOf((maxHeight - topPadding) * .62f, pad.calculateBottomPadding() + 24.dp)
                 LazyColumn(Modifier.fillMaxSize().testTag("workout-exercises").os4ScrollModifiers(workoutScrollBehavior).pointerInput(sessionId){detectDragGesturesAfterLongPress(
                     onDragStart={point->
                         if(pendingOrderIds!=null)return@detectDragGesturesAfterLongPress
                         val layout=workoutListState.layoutInfo
+                        val top = layout.beforeContentPadding - listSpacingPx
+                        if (point.y < top) return@detectDragGesturesAfterLongPress
                         val y=point.y+layout.viewportStartOffset
                         val hit=layout.visibleItemsInfo.firstOrNull{y>=it.offset && y<it.offset+it.size} ?: return@detectDragGesturesAfterLongPress
                         val groups=displayedExerciseGroupsState.value
@@ -307,7 +312,7 @@ fun WorkoutScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit,onAddExercise:
                         dragStartOffset=hit.offset;draggedCardSize=hit.size;dragDistance=0f
                         dragPointerY=point.y
                         // Only arm edge auto-scroll when the gesture starts clear of that edge (or later leaves it).
-                        topEdgeArmed=point.y >= dragEdgePx+dragSlop
+                        topEdgeArmed=point.y >= top+dragEdgePx+dragSlop
                         bottomEdgeArmed=point.y <= layout.viewportSize.height-dragEdgePx-dragSlop
                         dragMoved=false
                         dragHaptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
@@ -317,15 +322,17 @@ fun WorkoutScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit,onAddExercise:
                         if(draggingExerciseId!=null){
                             dragDistance+=amount.y
                             dragPointerY=change.position.y
-                            val height=workoutListState.layoutInfo.viewportSize.height
-                            if(!topEdgeArmed && dragPointerY >= dragEdgePx+dragSlop) topEdgeArmed=true
+                            val layout = workoutListState.layoutInfo
+                            val height=layout.viewportSize.height
+                            val top = layout.beforeContentPadding - listSpacingPx
+                            if(!topEdgeArmed && dragPointerY >= top+dragEdgePx+dragSlop) topEdgeArmed=true
                             if(!bottomEdgeArmed && dragPointerY <= height-dragEdgePx-dragSlop) bottomEdgeArmed=true
                             moveDraggedCard()
                         }
                     },
                     onDragEnd={if(draggingExerciseId!=null){finishDrag();dragHaptics.performHapticFeedback(HapticFeedbackType.Confirm)}},
                     onDragCancel=::finishDrag,
-                )},state=workoutListState,userScrollEnabled=draggingExerciseId==null,contentPadding=PaddingValues(top=12.dp,bottom=positioningTail)){
+                )},state=workoutListState,userScrollEnabled=draggingExerciseId==null,contentPadding=PaddingValues(top=topPadding+listSpacing,bottom=positioningTail)){
                     val displayedExerciseGroups=displayedExerciseGroupsState.value
                     displayedExerciseGroups.forEachIndexed{index,sets->val first=sets.first();val exerciseId=first.sessionExerciseId;item(key="exercise-$exerciseId"){
                         val dragging=draggingExerciseId==exerciseId

@@ -54,7 +54,7 @@ fun AboutScreen(onBack:()->Unit) {
     val dark=surface.luminance()<.5f
     val settings = LocalMiuixFeatureSettings.current
     val backdrop=if(isRuntimeShaderSupported())rememberLayerBackdrop{drawRect(surface);drawContent()}else null
-    val version=remember(context){context.packageManager.getPackageInfo(context.packageName,PackageManager.PackageInfoFlags.of(0)).versionName?:"0.2.0"}
+    val version=remember(context){context.packageManager.getPackageInfo(context.packageName,PackageManager.PackageInfoFlags.of(0)).versionName}
 
     Scaffold(topBar={
         GlassTopAppBar(
@@ -93,7 +93,7 @@ fun AboutScreen(onBack:()->Unit) {
                         }
                         val nameProgress=((scrollProgress-.2f)/.15f).coerceIn(0f,1f)
                         Text("练迹",Modifier.padding(top=12.dp,bottom=5.dp).graphicsLayer{alpha=1f-nameProgress;scaleX=1f-nameProgress*.05f;scaleY=scaleX},fontWeight=FontWeight.Bold,fontSize=35.sp)
-                        Text("v$version · 私人离线健身记录",Modifier.fillMaxWidth().graphicsLayer{alpha=1f-(scrollProgress/.15f).coerceIn(0f,1f)},color=MiuixTheme.colorScheme.onSurfaceVariantSummary,textAlign=TextAlign.Center,fontSize=14.sp)
+                        Text(version?.let { "v$it · 私人离线健身记录" } ?: "私人离线健身记录",Modifier.fillMaxWidth().graphicsLayer{alpha=1f-(scrollProgress/.15f).coerceIn(0f,1f)},color=MiuixTheme.colorScheme.onSurfaceVariantSummary,textAlign=TextAlign.Center,fontSize=14.sp)
                         Spacer(Modifier.height(126.dp))
                     }
                 }

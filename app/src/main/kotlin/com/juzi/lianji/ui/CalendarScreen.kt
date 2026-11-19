@@ -12,10 +12,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.juzi.lianji.MainViewModel
 import com.juzi.lianji.data.*
@@ -23,119 +26,227 @@ import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.RadioButtonLocation
 import top.yukonga.miuix.kmp.preference.RadioButtonPreference
 import top.yukonga.miuix.kmp.preference.CheckboxLocation
 import top.yukonga.miuix.kmp.preference.CheckboxPreference
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.Add
-import top.yukonga.miuix.kmp.icon.glass.ChevronForward
 import top.yukonga.miuix.kmp.icon.glass.ExpandLess
 import top.yukonga.miuix.kmp.icon.glass.ExpandMore
-import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import top.yukonga.miuix.kmp.anim.folmeSpring
 import java.time.YearMonth
 import java.time.LocalDate
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
-@Composable fun CalendarScreen(vm:MainViewModel,padding:PaddingValues,listState:LazyListState,scrollBehavior:ScrollBehavior,onDay:(String)->Unit,onMonth:(YearMonth)->Unit){
-    var monthValue by rememberSaveable{mutableStateOf(YearMonth.now().toString())};val month=YearMonth.parse(monthValue);val offset=month.atDay(1).dayOfWeek.value-1
-    val days by remember(vm,month){vm.repository.days(month.atDay(1).toString(),month.plusMonths(1).atDay(1).toString())}.collectAsStateWithLifecycle(emptyList())
-    val sessions by remember(vm,month){vm.repository.sessions(month.atDay(1).toString(),month.plusMonths(1).atDay(1).toString())}.collectAsStateWithLifecycle(emptyList())
-    val summaries=remember(days){days.groupBy{it.localDate}}
-    val completed=sessions.filter{it.localDate.startsWith(month.toString())&&it.status=="COMPLETED"};val trainingDays=completed.map{it.localDate}.distinct().size;val seconds=completed.sumOf{((it.endedAt?:it.startedAt)-it.startedAt).coerceAtLeast(0)}/1000
-    val layoutDirection = LocalLayoutDirection.current
+private val CalendarMonthFormat = DateTimeFormatter.ofPattern("yyyy年 M月")
+private val CalendarDateFormat = DateTimeFormatter.ofPattern("yyyy年M月d日")
+private val CalendarDateWithWeekdayFormat = DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.SIMPLIFIED_CHINESE)
+private val CalendarWeekdays = listOf("一", "二", "三", "四", "五", "六", "日")
+
+private enum class CalendarStatus(val label: String) {
+    Completed("已完成"),
+    Planned("已安排"),
+    Unfinished("未完成"),
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun CalendarScreen(
+    vm: MainViewModel,
+    padding: PaddingValues,
+    listState: LazyListState,
+    scrollBehavior: ScrollBehavior,
+    onDay: (String) -> Unit,
+    onMonth: (YearMonth) -> Unit,
+) {
+    val today = LocalDate.now()
+    val currentMonth = YearMonth.from(today)
+    var monthValue by rememberSaveable { mutableStateOf(currentMonth.toString()) }
+    val month = YearMonth.parse(monthValue)
+    val firstDay = month.atDay(1)
+    val firstColumn = firstDay.dayOfWeek.value - 1
+    val weeks = (firstColumn + month.lengthOfMonth() + 6) / 7
+    val endDate = month.plusMonths(1).atDay(1).toString()
+    val days by remember(vm, month) { vm.repository.days(firstDay.toString(), endDate) }
+        .collectAsStateWithLifecycle(emptyList())
+    val sessions by remember(vm, month) { vm.repository.sessions(firstDay.toString(), endDate) }
+        .collectAsStateWithLifecycle(emptyList())
+    val summaries = remember(days) {
+        days.groupBy { it.localDate }.mapValues { (_, entries) ->
+            entries.groupingBy {
+                when (it.status) {
+                    "COMPLETED" -> CalendarStatus.Completed
+                    "PLANNED" -> CalendarStatus.Planned
+                    else -> CalendarStatus.Unfinished
+                }
+            }.eachCount()
+        }
+    }
+    val completed = sessions.filter { it.localDate.startsWith(monthValue) && it.status == "COMPLETED" }
+    val trainingDays = completed.distinctBy { it.localDate }.size
+    val seconds = completed.sumOf { ((it.endedAt ?: it.startedAt) - it.startedAt).coerceAtLeast(0) } / 1000
+
     LazyColumn(
-        Modifier
-            .fillMaxSize()
-            .os4ScrollModifiers(scrollBehavior),
+        modifier = Modifier.fillMaxSize().os4ScrollModifiers(scrollBehavior),
         state = listState,
-        contentPadding = PaddingValues(
-            start = padding.calculateStartPadding(layoutDirection),
-            end = padding.calculateEndPadding(layoutDirection),
-            top = padding.calculateTopPadding() + 12.dp,
-            bottom = padding.calculateBottomPadding() + 24.dp,
-        ),
+        contentPadding = padding.withPageSpacing(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item{Card(modifier=Modifier.fillMaxWidth().cardPadding(),pressFeedbackType=PressFeedbackType.Sink,onClick={onMonth(month)}){Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("本月概览",style=MiuixTheme.textStyles.title2);Text("${month.format(DateTimeFormatter.ofPattern("yyyy年 M月"))} · 点击查看详细分析",color=MiuixTheme.colorScheme.onSurfaceSecondary)};Icon(MiuixIcons.Glass.ChevronForward,"查看月度分析",Modifier.size(22.dp))};Row(Modifier.fillMaxWidth()){MonthStat(trainingDays.toString(),"训练日",Modifier.weight(1f));MonthStat(completed.size.toString(),"训练次数",Modifier.weight(1f));MonthStat(formatLongDuration(seconds),"总时长",Modifier.weight(1f))}}}}
-        item{Card(Modifier.cardPadding()){Column(Modifier.padding(horizontal=4.dp,vertical=12.dp)){
-            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){PreviousButton{monthValue=month.minusMonths(1).toString()};Text(month.format(DateTimeFormatter.ofPattern("yyyy年 M月")),style=MiuixTheme.textStyles.title2);NextButton{monthValue=month.plusMonths(1).toString()}}
-            Row(Modifier.fillMaxWidth()){listOf("一","二","三","四","五","六","日").forEach{Text(it,Modifier.weight(1f),textAlign=TextAlign.Center,color=MiuixTheme.colorScheme.onSurfaceSecondary)}}
-            repeat(6) { week ->
-                Row(Modifier.fillMaxWidth()) {
-                    repeat(7) { column ->
-                        val day = week * 7 + column - offset + 1
-                        if (day in 1..month.lengthOfMonth()) {
-                            val date = month.atDay(day).toString()
-                            val entries = summaries[date].orEmpty()
-                            Surface(
-                                onClick = { onDay(date) },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(76.dp)
-                                    .padding(horizontal = 1.dp, vertical = 2.dp)
-                                    .squircleClip(14.dp),
-                                color = Color.Transparent,
-                                shadowElevation = 0.dp,
-                            ) {
-                                Column(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 2.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                ) {
-                                    Text(day.toString())
-                                    entries.take(2).forEach { entry ->
-                                        val completedEntry = entry.status == "COMPLETED"
-                                        Surface(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(top = 1.dp)
-                                                .squircleSurface(if (completedEntry) {
-                                                StatusColors.Healthy.copy(alpha = .14f)
-                                            } else {
-                                                StatusColors.Warning.copy(alpha = .14f)
-                                            },6.dp),
-                                            color = Color.Transparent,
-                                            shadowElevation = 0.dp,
-                                        ) {
-                                            Text(
-                                                entry.title,
-                                                Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(vertical = 1.dp),
-                                                style = MiuixTheme.textStyles.footnote2,
-                                                maxLines = 1,
-                                                textAlign = TextAlign.Center,
-                                                color = if (completedEntry) {
-                                                    StatusColors.Healthy
-                                                } else {
-                                                    StatusColors.Warning
-                                                },
-                                            )
-                                        }
-                                    }
-                                    if (entries.size > 2) {
-                                        Text(
-                                            "+${entries.size - 2}",
-                                            style = MiuixTheme.textStyles.footnote2,
-                                            color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                                        )
-                                    }
+        item {
+            Card(Modifier.widthIn(max = 640.dp).fillMaxWidth().cardPadding()) {
+                Column(Modifier.padding(horizontal = 10.dp, vertical = 12.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        PreviousButton { monthValue = month.minusMonths(1).toString() }
+                        Text(
+                            month.format(CalendarMonthFormat),
+                            modifier = Modifier.weight(1f),
+                            style = MiuixTheme.textStyles.title2,
+                            textAlign = TextAlign.Center,
+                        )
+                        NextButton { monthValue = month.plusMonths(1).toString() }
+                    }
+                    Row(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp)) {
+                        CalendarWeekdays.forEach { day ->
+                            Text(
+                                day,
+                                modifier = Modifier.weight(1f),
+                                style = MiuixTheme.textStyles.footnote1,
+                                textAlign = TextAlign.Center,
+                                color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                            )
+                        }
+                    }
+                    repeat(weeks) { week ->
+                        Row(Modifier.fillMaxWidth()) {
+                            repeat(7) { column ->
+                                val day = week * 7 + column - firstColumn + 1
+                                if (day in 1..month.lengthOfMonth()) {
+                                    val date = month.atDay(day)
+                                    CalendarDayCell(
+                                        date = date,
+                                        isToday = date == today,
+                                        statuses = summaries[date.toString()].orEmpty(),
+                                        modifier = Modifier.weight(1f),
+                                        onClick = { onDay(date.toString()) },
+                                    )
+                                } else {
+                                    Spacer(Modifier.weight(1f).height(52.dp))
                                 }
                             }
-                        } else {
-                            Spacer(Modifier.weight(1f).height(76.dp))
                         }
+                    }
+                    HorizontalDivider(Modifier.padding(top = 4.dp, bottom = 10.dp))
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        CalendarStatus.entries.forEach { status ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                CalendarStatusDot(status)
+                                Text(status.label, style = MiuixTheme.textStyles.footnote1)
+                            }
+                        }
+                    }
+                    if (month != currentMonth) {
+                        TextButton(
+                            text = "回到本月",
+                            onClick = { monthValue = currentMonth.toString() },
+                            modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp),
+                        )
                     }
                 }
             }
-        }}}
+        }
+        item {
+            Card(Modifier.widthIn(max = 640.dp).fillMaxWidth().cardPadding()) {
+                ArrowPreference(title = "月度分析", onClick = { onMonth(month) })
+                Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 16.dp)) {
+                    MonthStat(trainingDays.toString(), "训练日", Modifier.weight(1f))
+                    MonthStat(completed.size.toString(), "训练次数", Modifier.weight(1f))
+                    MonthStat(formatLongDuration(seconds), "总时长", Modifier.weight(1f))
+                }
+            }
+        }
     }
+}
+
+@Composable
+private fun CalendarDayCell(
+    date: LocalDate,
+    isToday: Boolean,
+    statuses: Map<CalendarStatus, Int>,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    val dateLabel = date.format(CalendarDateWithWeekdayFormat)
+    val recordSummary = CalendarStatus.entries.mapNotNull { status ->
+        statuses[status]?.let { "${status.label} ${it} 项" }
+    }.joinToString("，")
+    val colors = MiuixTheme.colorScheme
+    Surface(
+        onClick = onClick,
+        modifier = modifier
+            .heightIn(min = 52.dp)
+            .squircleClip(12.dp)
+            .semantics {
+                contentDescription = if (isToday) "今天，$dateLabel" else dateLabel
+                stateDescription = recordSummary.ifEmpty { "无训练记录" }
+            },
+        color = Color.Transparent,
+        shadowElevation = 0.dp,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).clearAndSetSemantics {},
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Box(
+                modifier = Modifier.sizeIn(minWidth = 30.dp, minHeight = 30.dp)
+                    .squircleSurface(if (isToday) colors.primary else Color.Transparent, 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    date.dayOfMonth.toString(),
+                    style = MiuixTheme.textStyles.body1,
+                    color = if (isToday) colors.onPrimary else colors.onSurface,
+                )
+            }
+            Row(
+                modifier = Modifier.padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                CalendarStatus.entries.forEach { status ->
+                    CalendarStatusDot(status, visible = status in statuses)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarStatusDot(status: CalendarStatus, visible: Boolean = true) {
+    val color = when (status) {
+        CalendarStatus.Completed -> StatusColors.Healthy
+        CalendarStatus.Planned -> StatusColors.Warning
+        CalendarStatus.Unfinished -> MiuixTheme.colorScheme.onSurfaceSecondary
+    }
+    Badge(containerColor = if (visible) color else Color.Transparent)
 }
 
 @Composable
@@ -167,7 +278,7 @@ fun DayDetailScreen(
     val sessions by remember(vm, date) { vm.repository.sessions(date, untilDate) }.collectAsStateWithLifecycle(emptyList())
     val schedules by remember(vm, date) { vm.repository.schedules(date, untilDate) }.collectAsStateWithLifecycle(emptyList())
     MiuixPageScaffold(
-        title = date,
+        title = parsedDate.format(CalendarDateFormat),
         navigationIcon = { BackButton(onBack) },
         scrollBehavior = dayScrollBehavior,
         actions = {
@@ -198,7 +309,14 @@ fun DayDetailScreen(
                 .os4ScrollModifiers(dayScrollBehavior),
             contentPadding = pad.withPageSpacing(),
         ) {
-            if (sessions.isEmpty() && schedules.isEmpty()) item { EmptyCard("这天没有训练", "可以在计划中安排训练") }
+            if (sessions.isEmpty() && schedules.isEmpty()) {
+                item {
+                    EmptyCard(
+                        title = "这天没有训练",
+                        subtitle = if (isFuture) "可在右上角安排训练" else "可在右上角补录训练",
+                    )
+                }
+            }
             items(sessions, key = { it.id }) { SessionHistoryCard(vm, it) }
             items(schedules, key = { "schedule-${it.id}" }) { ScheduleHistoryCard(vm, it, state.plans, onStartWorkout) }
         }

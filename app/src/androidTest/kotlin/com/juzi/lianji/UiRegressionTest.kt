@@ -8,6 +8,7 @@ import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -27,6 +28,8 @@ import org.junit.*
 import org.junit.Assert.*
 import java.io.File
 import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 class UiRegressionTest {
     @get:Rule val compose = createComposeRule()
@@ -72,6 +75,18 @@ class UiRegressionTest {
 
     private fun card(name: String)=compose.onNodeWithContentDescription("长按拖动 $name 调整顺序")
 
+    @Test fun active_workout_cards_scroll_behind_the_glass_top_bar() {
+        val sessionId = workout((0..15).map { "Blur$it" })
+        compose.setContent { LianJiApp(vm, requestedWorkoutId = sessionId) }
+        awaitText("Blur0")
+        val list = compose.onNodeWithTag("workout-exercises")
+        val backBottom = compose.onNodeWithContentDescription("返回").fetchSemanticsNode().boundsInRoot.bottom
+        assertTrue(card("Blur0").fetchSemanticsNode().boundsInRoot.top > backBottom)
+        val distance = with(compose.density) { 40.dp.toPx() }
+        list.performTouchInput { swipe(center, center - Offset(0f, distance), durationMillis = 600) }
+        assertTrue(card("Blur0").fetchSemanticsNode().boundsInRoot.top < backBottom)
+    }
+
     @Test fun dragging_visible_first_card_keeps_viewport_and_expanded_height() {
         val sessionId=workout((0..15).map { "Move$it" })
         compose.setContent { LianJiTheme(AppSettings(dynamicColor=false)) { WorkoutScreen(vm,sessionId,{},{},{}) } }
@@ -115,10 +130,12 @@ class UiRegressionTest {
         compose.setContent { LianJiTheme(AppSettings(dynamicColor=false)) { WorkoutScreen(vm,sessionId,{},{},{}) } }
         awaitText("Edge0")
         val list=compose.onNodeWithTag("workout-exercises")
+        val visibleTop = card("Edge0").fetchSemanticsNode().boundsInRoot.top -
+            list.fetchSemanticsNode().boundsInRoot.top - with(compose.density) { 12.dp.toPx() }
         fun dragToEdge(name: String, downwards: Boolean) {
             val bounds=list.fetchSemanticsNode().boundsInRoot
             val start=card(name).fetchSemanticsNode().boundsInRoot.center-bounds.topLeft
-            val end=Offset(start.x,if(downwards)bounds.height-8f else 8f)
+            val end=Offset(start.x,if(downwards)bounds.height-8f else visibleTop+8f)
             compose.mainClock.autoAdvance=false
             list.performTouchInput { down(start); advanceEventTime(600); moveTo(start) }
             compose.mainClock.advanceTimeBy(100)
@@ -145,6 +162,8 @@ class UiRegressionTest {
         compose.setContent { LianJiTheme(AppSettings(dynamicColor=false)) { WorkoutScreen(vm,sessionId,{},{},{}) } }
         awaitText("TopHold0")
         val list=compose.onNodeWithTag("workout-exercises")
+        val visibleTop = card("TopHold0").fetchSemanticsNode().boundsInRoot.top -
+            list.fetchSemanticsNode().boundsInRoot.top - with(compose.density) { 12.dp.toPx() }
         list.performScrollToIndex(5)
         compose.waitForIdle()
         val before=card("TopHold5").fetchSemanticsNode().boundsInRoot
@@ -158,10 +177,10 @@ class UiRegressionTest {
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
         assertEquals("Long-pressing topmost card with upward jitter caused rapid neighbor scroll",neighbor.top,card("TopHold6").fetchSemanticsNode().boundsInRoot.top,2f)
-        val clearY=with(compose.density) { 64.dp.toPx() }
+        val clearY=visibleTop+with(compose.density) { 64.dp.toPx() }
         list.performTouchInput { moveTo(Offset(start.x,clearY),100) }
         compose.mainClock.advanceTimeBy(100)
-        list.performTouchInput { moveTo(Offset(start.x,6f),100) }
+        list.performTouchInput { moveTo(Offset(start.x,visibleTop+6f),100) }
         compose.mainClock.advanceTimeBy(2_000)
         compose.waitForIdle()
         list.performTouchInput { up() }
@@ -176,7 +195,9 @@ class UiRegressionTest {
         val list=compose.onNodeWithTag("workout-exercises")
         val origin=list.fetchSemanticsNode().boundsInRoot.topLeft
         val viewportHeight=list.fetchSemanticsNode().boundsInRoot.height
-        val upperLimit=(viewportHeight*0.45f)
+        val visibleTop = card("UpperDrag0").fetchSemanticsNode().boundsInRoot.top -
+            origin.y - with(compose.density) { 12.dp.toPx() }
+        val upperLimit=visibleTop+(viewportHeight-visibleTop)*0.45f
 
         // 1. Fast downward drag of UpperDrag0 within the upper half of the viewport
         val before0=card("UpperDrag0").fetchSemanticsNode().boundsInRoot
@@ -357,18 +378,26 @@ class UiRegressionTest {
     @Test fun calendar_switches_month_and_opens_only_the_selected_days_records() {
         val month = YearMonth.now()
         val previous = month.minusMonths(1)
+        val dateLabel = DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.SIMPLIFIED_CHINESE)
+        val dayTitle = DateTimeFormatter.ofPattern("yyyy年M月d日")
+        val hasSchedule = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "已安排 1 项")
+        val thisMonthFirst = hasContentDescription(month.atDay(1).format(dateLabel), substring = true)
+        val previousMonthFirst = hasContentDescription(previous.atDay(1).format(dateLabel))
         runBlocking {
             db.scheduleDao().insert(ScheduledWorkoutEntity(planId=null,planName="本月测试安排",scheduledDate=month.atDay(1).toString()))
             db.scheduleDao().insert(ScheduledWorkoutEntity(planId=null,planName="上月测试安排",scheduledDate=previous.atDay(1).toString()))
         }
         compose.setContent { LianJiApp(vm) }
         compose.onNodeWithText("日历").performClick()
-        awaitText("本月测试安排")
+        compose.waitUntil(10_000) { compose.onAllNodes(thisMonthFirst and hasSchedule).fetchSemanticsNodes().size == 1 }
         compose.onNodeWithContentDescription("上月").performClick()
-        awaitText("上月测试安排")
-        compose.onNodeWithText("本月测试安排").assertDoesNotExist()
-        compose.onNodeWithText("上月测试安排").performClick()
-        awaitText(previous.atDay(1).toString())
+        compose.waitUntil(10_000) { compose.onAllNodes(previousMonthFirst and hasSchedule).fetchSemanticsNodes().size == 1 }
+        compose.onNode(thisMonthFirst).assertDoesNotExist()
+        compose.onNodeWithText("回到本月").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodes(thisMonthFirst and hasSchedule).fetchSemanticsNodes().size == 1 }
+        compose.onNodeWithContentDescription("上月").performClick()
+        compose.onNode(previousMonthFirst).performClick()
+        awaitText(previous.atDay(1).format(dayTitle))
         compose.onNode(hasText("上月测试安排") and hasAnySibling(hasText("训练已安排"))).assertIsDisplayed()
         compose.onNodeWithText("本月测试安排").assertDoesNotExist()
     }
