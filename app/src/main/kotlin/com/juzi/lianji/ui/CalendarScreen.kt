@@ -17,12 +17,14 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.juzi.lianji.MainViewModel
 import com.juzi.lianji.data.*
 import top.yukonga.miuix.kmp.basic.*
+import top.yukonga.miuix.kmp.squircle.squircleBorder
 import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -45,18 +47,10 @@ import java.util.Locale
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
-private val CalendarMonthFormat = DateTimeFormatter.ofPattern("yyyy年 M月")
 private val CalendarDateFormat = DateTimeFormatter.ofPattern("yyyy年M月d日")
 private val CalendarDateWithWeekdayFormat = DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.SIMPLIFIED_CHINESE)
 private val CalendarWeekdays = listOf("一", "二", "三", "四", "五", "六", "日")
 
-private enum class CalendarStatus(val label: String) {
-    Completed("已完成"),
-    Planned("已安排"),
-    Unfinished("未完成"),
-}
-
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CalendarScreen(
     vm: MainViewModel,
@@ -74,23 +68,10 @@ fun CalendarScreen(
     val firstColumn = firstDay.dayOfWeek.value - 1
     val weeks = (firstColumn + month.lengthOfMonth() + 6) / 7
     val endDate = month.plusMonths(1).atDay(1).toString()
-    val days by remember(vm, month) { vm.repository.days(firstDay.toString(), endDate) }
-        .collectAsStateWithLifecycle(emptyList())
     val sessions by remember(vm, month) { vm.repository.sessions(firstDay.toString(), endDate) }
         .collectAsStateWithLifecycle(emptyList())
-    val summaries = remember(days) {
-        days.groupBy { it.localDate }.mapValues { (_, entries) ->
-            entries.groupingBy {
-                when (it.status) {
-                    "COMPLETED" -> CalendarStatus.Completed
-                    "PLANNED" -> CalendarStatus.Planned
-                    else -> CalendarStatus.Unfinished
-                }
-            }.eachCount()
-        }
-    }
     val completed = sessions.filter { it.localDate.startsWith(monthValue) && it.status == "COMPLETED" }
-    val trainingDays = completed.distinctBy { it.localDate }.size
+    val completedByDate = completed.groupBy { it.localDate }
     val seconds = completed.sumOf { ((it.endedAt ?: it.startedAt) - it.startedAt).coerceAtLeast(0) } / 1000
 
     LazyColumn(
@@ -101,75 +82,54 @@ fun CalendarScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Card(Modifier.widthIn(max = 640.dp).fillMaxWidth().cardPadding()) {
-                Column(Modifier.padding(horizontal = 10.dp, vertical = 12.dp)) {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        PreviousButton { monthValue = month.minusMonths(1).toString() }
+            Column(Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(horizontal = 12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("${month.monthValue}月", style = MiuixTheme.textStyles.title1)
+                        Text("${month.year}年", color = MiuixTheme.colorScheme.onSurfaceSecondary)
+                    }
+                    PreviousButton { monthValue = month.minusMonths(1).toString() }
+                    NextButton { monthValue = month.plusMonths(1).toString() }
+                }
+                Row(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp)) {
+                    CalendarWeekdays.forEachIndexed { index, day ->
                         Text(
-                            month.format(CalendarMonthFormat),
+                            day,
                             modifier = Modifier.weight(1f),
-                            style = MiuixTheme.textStyles.title2,
+                            style = MiuixTheme.textStyles.footnote1,
                             textAlign = TextAlign.Center,
+                            color = if (index >= 5) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceSecondary,
                         )
-                        NextButton { monthValue = month.plusMonths(1).toString() }
                     }
-                    Row(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp)) {
-                        CalendarWeekdays.forEach { day ->
-                            Text(
-                                day,
-                                modifier = Modifier.weight(1f),
-                                style = MiuixTheme.textStyles.footnote1,
-                                textAlign = TextAlign.Center,
-                                color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                            )
-                        }
-                    }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val gridStart = firstDay.minusDays(firstColumn.toLong())
                     repeat(weeks) { week ->
-                        Row(Modifier.fillMaxWidth()) {
+                        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                             repeat(7) { column ->
-                                val day = week * 7 + column - firstColumn + 1
-                                if (day in 1..month.lengthOfMonth()) {
-                                    val date = month.atDay(day)
-                                    CalendarDayCell(
-                                        date = date,
-                                        isToday = date == today,
-                                        statuses = summaries[date.toString()].orEmpty(),
-                                        modifier = Modifier.weight(1f),
-                                        onClick = { onDay(date.toString()) },
-                                    )
-                                } else {
-                                    Spacer(Modifier.weight(1f).height(52.dp))
-                                }
+                                val date = gridStart.plusDays((week * 7 + column).toLong())
+                                CalendarDayCell(
+                                    date = date,
+                                    inMonth = YearMonth.from(date) == month,
+                                    isToday = date == today,
+                                    completed = completedByDate[date.toString()].orEmpty(),
+                                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                                    onClick = { onDay(date.toString()) },
+                                )
                             }
                         }
                     }
-                    HorizontalDivider(Modifier.padding(top = 4.dp, bottom = 10.dp))
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        CalendarStatus.entries.forEach { status ->
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(5.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                CalendarStatusDot(status)
-                                Text(status.label, style = MiuixTheme.textStyles.footnote1)
-                            }
-                        }
-                    }
-                    if (month != currentMonth) {
-                        TextButton(
-                            text = "回到本月",
-                            onClick = { monthValue = currentMonth.toString() },
-                            modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp),
-                        )
-                    }
+                }
+                if (month != currentMonth) {
+                    TextButton(
+                        text = "回到本月",
+                        onClick = { monthValue = currentMonth.toString() },
+                        modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp),
+                    )
                 }
             }
         }
@@ -177,7 +137,7 @@ fun CalendarScreen(
             Card(Modifier.widthIn(max = 640.dp).fillMaxWidth().cardPadding()) {
                 ArrowPreference(title = "月度分析", onClick = { onMonth(month) })
                 Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 16.dp)) {
-                    MonthStat(trainingDays.toString(), "训练日", Modifier.weight(1f))
+                    MonthStat(completedByDate.size.toString(), "训练日", Modifier.weight(1f))
                     MonthStat(completed.size.toString(), "训练次数", Modifier.weight(1f))
                     MonthStat(formatLongDuration(seconds), "总时长", Modifier.weight(1f))
                 }
@@ -189,64 +149,74 @@ fun CalendarScreen(
 @Composable
 private fun CalendarDayCell(
     date: LocalDate,
+    inMonth: Boolean,
     isToday: Boolean,
-    statuses: Map<CalendarStatus, Int>,
+    completed: List<WorkoutSessionEntity>,
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
-    val dateLabel = date.format(CalendarDateWithWeekdayFormat)
-    val recordSummary = CalendarStatus.entries.mapNotNull { status ->
-        statuses[status]?.let { "${status.label} ${it} 项" }
-    }.joinToString("，")
     val colors = MiuixTheme.colorScheme
+    val visibleSessions = completed.take(2)
+    val remaining = completed.size - visibleSessions.size
     Surface(
         onClick = onClick,
+        enabled = inMonth,
         modifier = modifier
-            .heightIn(min = 52.dp)
             .squircleClip(12.dp)
             .semantics {
-                contentDescription = if (isToday) "今天，$dateLabel" else dateLabel
-                stateDescription = recordSummary.ifEmpty { "无训练记录" }
+                val dateLabel = date.format(CalendarDateWithWeekdayFormat)
+                contentDescription = if (isToday && inMonth) "今天，$dateLabel" else dateLabel
+                if (inMonth) {
+                    stateDescription = if (completed.isEmpty()) "无已完成训练" else "已完成 ${completed.size} 项"
+                }
             },
         color = Color.Transparent,
         shadowElevation = 0.dp,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).clearAndSetSemantics {},
+            modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).padding(horizontal = 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+            verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
+            val dateBorder = if (isToday && inMonth) Modifier.squircleBorder(1.5.dp, colors.primary, 10.dp) else Modifier
             Box(
-                modifier = Modifier.sizeIn(minWidth = 30.dp, minHeight = 30.dp)
-                    .squircleSurface(if (isToday) colors.primary else Color.Transparent, 10.dp),
+                modifier = Modifier.sizeIn(minWidth = 32.dp, minHeight = 32.dp)
+                    .then(dateBorder)
+                    .clearAndSetSemantics {},
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     date.dayOfMonth.toString(),
-                    style = MiuixTheme.textStyles.body1,
-                    color = if (isToday) colors.onPrimary else colors.onSurface,
+                    style = MiuixTheme.textStyles.title4,
+                    color = when {
+                        !inMonth -> colors.disabledOnSurface
+                        date.dayOfWeek.value >= 6 -> colors.primary
+                        else -> colors.onSurface
+                    },
                 )
             }
-            Row(
-                modifier = Modifier.padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                CalendarStatus.entries.forEach { status ->
-                    CalendarStatusDot(status, visible = status in statuses)
-                }
+            visibleSessions.forEach { session ->
+                Text(
+                    text = session.planNameSnapshot,
+                    modifier = Modifier.fillMaxWidth().squircleSurface(colors.primaryContainer, 5.dp)
+                        .padding(horizontal = 3.dp, vertical = 2.dp),
+                    color = colors.onPrimaryContainer,
+                    style = MiuixTheme.textStyles.footnote2,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (remaining > 0) {
+                Text(
+                    "+$remaining",
+                    modifier = Modifier.clearAndSetSemantics {},
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = colors.onSurfaceSecondary,
+                )
             }
         }
     }
-}
-
-@Composable
-private fun CalendarStatusDot(status: CalendarStatus, visible: Boolean = true) {
-    val color = when (status) {
-        CalendarStatus.Completed -> StatusColors.Healthy
-        CalendarStatus.Planned -> StatusColors.Warning
-        CalendarStatus.Unfinished -> MiuixTheme.colorScheme.onSurfaceSecondary
-    }
-    Badge(containerColor = if (visible) color else Color.Transparent)
 }
 
 @Composable

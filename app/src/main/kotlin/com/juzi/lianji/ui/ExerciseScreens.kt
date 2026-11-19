@@ -16,9 +16,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
@@ -37,8 +39,8 @@ import top.yukonga.miuix.kmp.glass.GlassFloatingActionButtonDefaults
 import top.yukonga.miuix.kmp.glass.GlassSegmentedTabRow
 import top.yukonga.miuix.kmp.glass.GlassSegmentedTabRowDefaults
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.glass.Back
 import top.yukonga.miuix.kmp.icon.glass.Edit
-import top.yukonga.miuix.kmp.icon.glass.ExpandLess
 import top.yukonga.miuix.kmp.icon.glass.FavoriteFill
 import top.yukonga.miuix.kmp.icon.glass.FavoriteOutline
 import top.yukonga.miuix.kmp.interfaces.ExperimentalScrollBarApi
@@ -123,9 +125,10 @@ fun ExerciseLibraryScreen(state:MainUiState,padding:PaddingValues,listState:Lazy
                 stroke = rememberOs4EdgeStroke(GlassFloatingActionButtonDefaults.stroke()),
             ) {
                 Icon(
-                    imageVector = MiuixIcons.Glass.ExpandLess,
+                    imageVector = MiuixIcons.Glass.Back,
                     contentDescription = "回到顶部",
-                    modifier = Modifier.size(28.dp),
+                    modifier = Modifier.size(28.dp)
+                        .rotate(if (layoutDirection == LayoutDirection.Rtl) -90f else 90f),
                     tint = if (customMaterial != null) MiuixTheme.colorScheme.onSurface else MiuixTheme.colorScheme.onPrimary,
                 )
             }

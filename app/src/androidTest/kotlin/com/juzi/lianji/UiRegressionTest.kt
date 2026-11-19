@@ -8,10 +8,12 @@ import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewModelScope
 import androidx.room.Room
@@ -380,21 +382,38 @@ class UiRegressionTest {
         val previous = month.minusMonths(1)
         val dateLabel = DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.SIMPLIFIED_CHINESE)
         val dayTitle = DateTimeFormatter.ofPattern("yyyy年M月d日")
-        val hasSchedule = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "已安排 1 项")
-        val thisMonthFirst = hasContentDescription(month.atDay(1).format(dateLabel), substring = true)
-        val previousMonthFirst = hasContentDescription(previous.atDay(1).format(dateLabel))
+        val hasCompleted = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "已完成 3 项")
+        val thisMonthFirst = hasContentDescription(month.atDay(1).format(dateLabel), substring = true) and isEnabled()
+        val previousMonthFirst = hasContentDescription(previous.atDay(1).format(dateLabel)) and isEnabled()
         runBlocking {
             db.scheduleDao().insert(ScheduledWorkoutEntity(planId=null,planName="本月测试安排",scheduledDate=month.atDay(1).toString()))
             db.scheduleDao().insert(ScheduledWorkoutEntity(planId=null,planName="上月测试安排",scheduledDate=previous.atDay(1).toString()))
+            listOf("最早训练", "力量训练", "有氧", "中断训练").forEachIndexed { index, title ->
+                val start = index * 100_000L
+                db.sessionDao().insertSession(
+                    WorkoutSessionEntity(
+                        sourcePlanId = null, planNameSnapshot = title, startedAt = start, endedAt = start + 60_000,
+                        localDate = month.atDay(1).toString(), status = if (index == 3) "INTERRUPTED" else "COMPLETED",
+                    ),
+                )
+            }
         }
         compose.setContent { LianJiApp(vm) }
         compose.onNodeWithText("日历").performClick()
-        compose.waitUntil(10_000) { compose.onAllNodes(thisMonthFirst and hasSchedule).fetchSemanticsNodes().size == 1 }
+        compose.waitUntil(10_000) { compose.onAllNodes(thisMonthFirst and hasCompleted).fetchSemanticsNodes().size == 1 }
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText("有氧", useUnmergedTree = true).assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val label = layouts.single()
+        assertEquals(label.size.width / 2f, (label.getLineLeft(0) + label.getLineRight(0)) / 2f, 1f)
+        compose.onNodeWithText("力量训练", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("最早训练").assertDoesNotExist()
+        compose.onNodeWithText("中断训练").assertDoesNotExist()
+        compose.onNodeWithText("本月测试安排").assertDoesNotExist()
         compose.onNodeWithContentDescription("上月").performClick()
-        compose.waitUntil(10_000) { compose.onAllNodes(previousMonthFirst and hasSchedule).fetchSemanticsNodes().size == 1 }
         compose.onNode(thisMonthFirst).assertDoesNotExist()
         compose.onNodeWithText("回到本月").performClick()
-        compose.waitUntil(10_000) { compose.onAllNodes(thisMonthFirst and hasSchedule).fetchSemanticsNodes().size == 1 }
+        compose.waitUntil(10_000) { compose.onAllNodes(thisMonthFirst and hasCompleted).fetchSemanticsNodes().size == 1 }
         compose.onNodeWithContentDescription("上月").performClick()
         compose.onNode(previousMonthFirst).performClick()
         awaitText(previous.atDay(1).format(dayTitle))
