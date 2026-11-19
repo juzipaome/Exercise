@@ -10,6 +10,8 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -17,12 +19,14 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -34,6 +38,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
@@ -92,6 +97,7 @@ fun WorkoutScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit,onAddExercise:
     LaunchedEffect(Unit){if(ContextCompat.checkSelfPermission(context,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)permission.launch(Manifest.permission.POST_NOTIFICATIONS)}
     val totalSeconds=session?.let{((finishedAt?:it.endedAt?:it.startedAt)-it.startedAt).coerceAtLeast(0)/1000}?:0
     val isFinished=finishedAt!=null||session?.status=="COMPLETED";val workoutListState=rememberLazyListState();var pendingScrollSetId by remember{mutableStateOf<Long?>(null)}
+    var revealSetId by remember { mutableStateOf<Long?>(null) }
     val currentRest = session?.restSecondsOverride ?: rows.firstOrNull()?.restSeconds ?: state.settings.defaultRestSeconds
     val dragHaptics=LocalHapticFeedback.current
     val layoutDirection = LocalLayoutDirection.current
@@ -140,9 +146,10 @@ fun WorkoutScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit,onAddExercise:
         // Auto-reveal owns the motion for the whole list; other cards must not
         // keep a separate placement spring running after the scroll settles.
         workoutListState.animateScrollToItem(target)
+        revealSetId = setId
         pendingScrollSetId=null
     }
-    fun beginSet(setId:Long){animatePlacement=false;pendingScrollSetId=setId;vm.beginSet(setId)}
+    fun beginSet(setId:Long){animatePlacement=false;revealSetId=null;pendingScrollSetId=setId;vm.beginSet(setId)}
     fun openSheet(kind:WorkoutSheet){sheetKind=kind;showSheet=true}
     fun swapDraggedCard(from:Int,to:Int){
         val anchorIndex=workoutListState.firstVisibleItemIndex
@@ -266,7 +273,9 @@ fun WorkoutScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit,onAddExercise:
                 }
             }
         },
-        floatingToolbar={WorkoutRestToolbar(rows,now,::beginSet)},
+        topBarBottomContent={
+            WorkoutRestToolbar(rows,now,isFinished,{workoutListState.canScrollBackward},::beginSet)
+        },
         overlay={pageBackdrop->
             if(!isFinished){
                 GlassIconDropdownMenu(
@@ -286,7 +295,7 @@ fun WorkoutScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit,onAddExercise:
                 LazyColumn(Modifier.fillMaxSize().os4ScrollModifiers(workoutScrollBehavior), contentPadding = pad.withPageSpacing()) {
                     item { CompletedWorkoutSummary(rows, state, totalSeconds, onBack) }
                 }
-            } else BoxWithConstraints(
+            } else Box(
                 Modifier.fillMaxSize()
                     .padding(
                         start = pad.calculateStartPadding(layoutDirection),
@@ -296,7 +305,6 @@ fun WorkoutScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit,onAddExercise:
                     .imePadding(),
             ) {
                 val topPadding = pad.calculateTopPadding()
-                val positioningTail = maxOf((maxHeight - topPadding) * .62f, pad.calculateBottomPadding() + 24.dp)
                 LazyColumn(Modifier.fillMaxSize().testTag("workout-exercises").os4ScrollModifiers(workoutScrollBehavior).pointerInput(sessionId){detectDragGesturesAfterLongPress(
                     onDragStart={point->
                         if(pendingOrderIds!=null)return@detectDragGesturesAfterLongPress
@@ -332,12 +340,15 @@ fun WorkoutScreen(vm:MainViewModel,sessionId:Long,onBack:()->Unit,onAddExercise:
                     },
                     onDragEnd={if(draggingExerciseId!=null){finishDrag();dragHaptics.performHapticFeedback(HapticFeedbackType.Confirm)}},
                     onDragCancel=::finishDrag,
-                )},state=workoutListState,userScrollEnabled=draggingExerciseId==null,contentPadding=PaddingValues(top=topPadding+listSpacing,bottom=positioningTail)){
+                )},state=workoutListState,userScrollEnabled=draggingExerciseId==null,contentPadding=PaddingValues(top=topPadding+listSpacing,bottom=pad.calculateBottomPadding()+24.dp)){
                     val displayedExerciseGroups=displayedExerciseGroupsState.value
                     displayedExerciseGroups.forEachIndexed{index,sets->val first=sets.first();val exerciseId=first.sessionExerciseId;item(key="exercise-$exerciseId"){
                         val dragging=draggingExerciseId==exerciseId
                         ReorderableWorkoutCard(first.exerciseName,index,displayedExerciseGroups.size,dragging,{if(dragging){val offset=workoutListState.layoutInfo.visibleItemsInfo.firstOrNull{it.key=="exercise-$exerciseId"}?.offset?:dragStartOffset;dragStartOffset+dragDistance-offset}else 0f},if(dragging||pendingScrollSetId!=null||!animatePlacement)Modifier else Modifier.animateItem(fadeInSpec=null,placementSpec=folmeSpring(.88f,.32f),fadeOutSpec=null),onAccessibilityMove={from,to->animatePlacement=true;val reordered=movedItem(exerciseGroups,from,to);vm.reorderExercises(sessionId,reordered.map{it.first().sessionExerciseId})}) { dragging ->
-                            if(first.trackingMode==TrackingMode.CARDIO)CardioWorkoutCard(sets,now,dragging,{onExerciseDetail(first.exerciseId)},{deleteExercise=first},::beginSet,vm::pauseSet,vm::completeCardio,vm::updateCardioValues,vm::updateCardioDraft,::requestDeleteSet)else ExerciseWorkoutCard(sets,now,dragging,{onExerciseDetail(first.exerciseId)},{deleteExercise=first},::beginSet,{vm.pauseSet(it)},{id,w,r->vm.completeSet(id,w,r)},vm::updateSetValues,::requestDeleteSet){val last=sets.last();vm.addSet(exerciseId,sets.size,last.weightKg,last.reps)}
+                            val requestedSetId = pendingScrollSetId ?: revealSetId
+                            val requestedSet = requestedSetId?.takeIf { id -> sets.any { it.setId == id } }
+                            val onControlsRevealed = { if (revealSetId == requestedSet) revealSetId = null }
+                            if(first.trackingMode==TrackingMode.CARDIO)CardioWorkoutCard(sets,now,dragging,requestedSet,revealSetId,onControlsRevealed,{onExerciseDetail(first.exerciseId)},{deleteExercise=first},::beginSet,vm::pauseSet,vm::completeCardio,vm::updateCardioValues,vm::updateCardioDraft,::requestDeleteSet)else ExerciseWorkoutCard(sets,now,dragging,requestedSet,revealSetId,onControlsRevealed,{onExerciseDetail(first.exerciseId)},{deleteExercise=first},::beginSet,{vm.pauseSet(it)},{id,w,r->vm.completeSet(id,w,r)},vm::updateSetValues,::requestDeleteSet){val last=sets.last();vm.addSet(exerciseId,sets.size,last.weightKg,last.reps)}
                         }
                     }}
                 }
@@ -436,20 +447,20 @@ private fun ReorderableWorkoutCard(
 }
 
 @Composable
-private fun CardioWorkoutCard(records:List<SessionSetRow>,now:State<Long>,dragging:Boolean,onDetail:()->Unit,onDeleteExercise:()->Unit,onBegin:(Long)->Unit,onPause:(Long)->Unit,onComplete:(Long,Double)->Unit,onEdit:(Long,Int,Double)->Unit,onDraft:(Long,Double)->Unit,onDelete:(Long)->Unit){
-    val first=records.first();val hasActivity=records.any{it.startedAt!=null||it.completed};var expanded by rememberSaveable(first.sessionExerciseId){mutableStateOf(true)};LaunchedEffect(hasActivity){if(hasActivity)expanded=true}
+private fun CardioWorkoutCard(records:List<SessionSetRow>,now:State<Long>,dragging:Boolean,requestedSet:Long?,revealSetId:Long?,onControlsRevealed:()->Unit,onDetail:()->Unit,onDeleteExercise:()->Unit,onBegin:(Long)->Unit,onPause:(Long)->Unit,onComplete:(Long,Double)->Unit,onEdit:(Long,Int,Double)->Unit,onDraft:(Long,Double)->Unit,onDelete:(Long)->Unit){
+    val first=records.first();val hasActivity=records.any{it.startedAt!=null||it.completed};var expanded by rememberSaveable(first.sessionExerciseId){mutableStateOf(true)};LaunchedEffect(hasActivity,requestedSet){if(hasActivity||requestedSet!=null)expanded=true}
     Card(Modifier.cardPadding()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
         Surface(onClick={expanded=!expanded},enabled=!dragging,modifier=Modifier.fillMaxWidth().padding(vertical=2.dp).squircleClip(16.dp),color=Color.Transparent,shadowElevation=0.dp){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
             val media=first.gifPath?:first.imagePath;if(media!=null)AsyncImage("file:///android_asset/$media",null,Modifier.size(72.dp).squircleClip(16.dp),contentScale=ContentScale.Crop)
             Column(Modifier.weight(1f)){Text(first.exerciseName,style=MiuixTheme.textStyles.title2);Text(if(hasActivity)"有氧计时 · ${records.count{it.completed}} 次已完成" else "有氧计时 · 未开始",color=MiuixTheme.colorScheme.onSurfaceSecondary)}
             if(dragging)Icon(MiuixIcons.Glass.Sort,"拖动排序",Modifier.size(22.dp))else{WorkoutCardMenu(first.exerciseName,onDetail,onDeleteExercise);Icon(if(expanded)MiuixIcons.Glass.ExpandLess else MiuixIcons.Glass.ExpandMore,if(expanded)"收起" else "展开",Modifier.size(22.dp))}
         }}
-        AnimatedVisibility(expanded,enter=expandVertically(folmeSpring(.9f,.32f))+fadeIn(folmeSpring(.9f,.28f)),exit=shrinkVertically(folmeSpring(.92f,.28f))+fadeOut(folmeSpring(.95f,.24f))){Column(verticalArrangement=Arrangement.spacedBy(8.dp)){records.forEach{record->CardioRecordRow(record,now,{onBegin(record.setId)},{onPause(record.setId)},{distance->onComplete(record.setId,distance)},{duration,distance->onEdit(record.setId,duration,distance)},{onDelete(record.setId)},{distance->onDraft(record.setId,distance)})}}}
+        AnimatedVisibility(expanded,enter=expandVertically(folmeSpring(.9f,.32f))+fadeIn(folmeSpring(.9f,.28f)),exit=shrinkVertically(folmeSpring(.92f,.28f))+fadeOut(folmeSpring(.95f,.24f))){Column(verticalArrangement=Arrangement.spacedBy(8.dp)){records.forEach{record->CardioRecordRow(record,now,{onBegin(record.setId)},{onPause(record.setId)},{distance->onComplete(record.setId,distance)},{duration,distance->onEdit(record.setId,duration,distance)},{onDelete(record.setId)},{distance->onDraft(record.setId,distance)},revealControls=record.setId==revealSetId&&transition.currentState==EnterExitState.Visible,onControlsRevealed=onControlsRevealed)}}}
     }}
 }
 
 @Composable
-private fun CardioRecordRow(record:SessionSetRow,now:State<Long>,onBegin:()->Unit,onPause:()->Unit,onComplete:(Double)->Unit,onEdit:(Int,Double)->Unit,onDelete:()->Unit,onDraft:(Double)->Unit={},allowDelete:Boolean=true){
+private fun CardioRecordRow(record:SessionSetRow,now:State<Long>,onBegin:()->Unit,onPause:()->Unit,onComplete:(Double)->Unit,onEdit:(Int,Double)->Unit,onDelete:()->Unit,onDraft:(Double)->Unit={},allowDelete:Boolean=true,revealControls:Boolean=false,onControlsRevealed:()->Unit={}){
     var distance by rememberSaveable(record.setId){mutableStateOf(if(record.distanceKm>0)exactDecimal(record.distanceKm) else "")}
     var minutes by rememberSaveable(record.setId){mutableStateOf(if(record.durationSeconds>0)minutesForEdit(record.durationSeconds) else "")}
     var editing by rememberSaveable(record.setId){mutableStateOf(false)}
@@ -461,26 +472,26 @@ private fun CardioRecordRow(record:SessionSetRow,now:State<Long>,onBegin:()->Uni
         }
     }
     when{
-        active->Column(verticalArrangement=Arrangement.spacedBy(10.dp)){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(if(paused)"已暂停" else "进行中",style=MiuixTheme.textStyles.title3,color=MiuixTheme.colorScheme.primary);Text(formatDuration(elapsed),style=MiuixTheme.textStyles.title1)};IconButton(onClick=onDelete){Icon(MiuixIcons.Glass.Delete,"删除记录",Modifier.size(22.dp))}};TextField(distance,{distance=it;validWeight(it.ifBlank{"0"})?.let(onDraft)},label="距离（km，可选）",keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),modifier=Modifier.fillMaxWidth());Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)){Button(onClick=if(paused)onBegin else onPause,modifier=Modifier.weight(1f)){Icon(if(paused)MiuixIcons.Glass.Play else MiuixIcons.Glass.Pause,if(paused)"继续" else "暂停",Modifier.size(20.dp));Text(if(paused)"继续" else "暂停")};Button(enabled=validWeight(distance.ifBlank{"0"})!=null,onClick={onComplete(validWeight(distance.ifBlank{"0"})!!)},colors=ButtonDefaults.buttonColorsPrimary(),modifier=Modifier.weight(1f)){Text("结束并保存")}}}
+        active->Column(verticalArrangement=Arrangement.spacedBy(10.dp)){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(if(paused)"已暂停" else "进行中",style=MiuixTheme.textStyles.title3,color=MiuixTheme.colorScheme.primary);Text(formatDuration(elapsed),style=MiuixTheme.textStyles.title1)};IconButton(onClick=onDelete){Icon(MiuixIcons.Glass.Delete,"删除记录",Modifier.size(22.dp))}};TextField(distance,{distance=it;validWeight(it.ifBlank{"0"})?.let(onDraft)},label="距离（km，可选）",keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),modifier=Modifier.fillMaxWidth());Row(Modifier.fillMaxWidth().revealWorkoutControls(revealControls,onControlsRevealed),horizontalArrangement=Arrangement.spacedBy(10.dp)){Button(onClick=if(paused)onBegin else onPause,modifier=Modifier.weight(1f)){Icon(if(paused)MiuixIcons.Glass.Play else MiuixIcons.Glass.Pause,if(paused)"继续" else "暂停",Modifier.size(20.dp));Text(if(paused)"继续" else "暂停")};Button(enabled=validWeight(distance.ifBlank{"0"})!=null,onClick={onComplete(validWeight(distance.ifBlank{"0"})!!)},colors=ButtonDefaults.buttonColorsPrimary(),modifier=Modifier.weight(1f)){Text("结束并保存")}}}
         editing->Column(verticalArrangement=Arrangement.spacedBy(10.dp)){Text("修改有氧记录",style=MiuixTheme.textStyles.title3);Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){TextField(minutes,{minutes=it},label="时长（分钟）",keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),modifier=Modifier.weight(1f));TextField(distance,{distance=it},label="距离（km）",keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),modifier=Modifier.weight(1f))};Button(enabled=validWeight(minutes)!=null&&validWeight(distance.ifBlank{"0"})!=null,onClick={onEdit(minutesToSeconds(minutes),validWeight(distance.ifBlank{"0"})!!);editing=false},modifier=Modifier.fillMaxWidth()){Text("保存修改")}}
         record.completed->Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(cardioSummary(record),style=MiuixTheme.textStyles.title3);Text("已完成",color=MiuixTheme.colorScheme.primary)};IconButton(onClick={minutes=minutesForEdit(record.durationSeconds);distance=exactDecimal(record.distanceKm);editing=true}){Icon(MiuixIcons.Glass.Edit,"编辑有氧记录",Modifier.size(22.dp))};if(allowDelete)IconButton(onClick=onDelete){Icon(MiuixIcons.Glass.Delete,"删除记录",Modifier.size(22.dp))}}
         else->Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("准备开始",style=MiuixTheme.textStyles.title3);Text("自动记录运动时长，结束时可填写距离",color=MiuixTheme.colorScheme.onSurfaceSecondary)};IconButton(onClick=onBegin){Icon(MiuixIcons.Glass.Play,"开始有氧",Modifier.size(22.dp))};IconButton(onClick=onDelete){Icon(MiuixIcons.Glass.Delete,"删除记录",Modifier.size(22.dp))}}
     }
 }
 
-@Composable private fun ExerciseWorkoutCard(sets:List<SessionSetRow>,now:State<Long>,dragging:Boolean,onDetail:()->Unit,onDeleteExercise:()->Unit,onBegin:(Long)->Unit,onPause:(Long)->Unit,onComplete:(Long,Double,Int)->Unit,onEdit:(Long,Double,Int)->Unit,onDelete:(Long)->Unit,onAdd:()->Unit){val first=sets.first();val hasActivity=sets.any{it.startedAt!=null||it.completed};var expanded by rememberSaveable(first.sessionExerciseId){mutableStateOf(hasActivity)};LaunchedEffect(hasActivity){if(hasActivity)expanded=true};Card(Modifier.cardPadding()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+@Composable private fun ExerciseWorkoutCard(sets:List<SessionSetRow>,now:State<Long>,dragging:Boolean,requestedSet:Long?,revealSetId:Long?,onControlsRevealed:()->Unit,onDetail:()->Unit,onDeleteExercise:()->Unit,onBegin:(Long)->Unit,onPause:(Long)->Unit,onComplete:(Long,Double,Int)->Unit,onEdit:(Long,Double,Int)->Unit,onDelete:(Long)->Unit,onAdd:()->Unit){val first=sets.first();val hasActivity=sets.any{it.startedAt!=null||it.completed};var expanded by rememberSaveable(first.sessionExerciseId){mutableStateOf(hasActivity)};LaunchedEffect(hasActivity,requestedSet){if(hasActivity||requestedSet!=null)expanded=true};Card(Modifier.cardPadding()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
     Surface(onClick={expanded=!expanded},enabled=!dragging,modifier=Modifier.fillMaxWidth().padding(vertical=2.dp).squircleClip(16.dp),color=Color.Transparent,shadowElevation=0.dp){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){val media=first.gifPath?:first.imagePath;if(media!=null)AsyncImage("file:///android_asset/$media",null,Modifier.size(72.dp).squircleClip(16.dp),contentScale=ContentScale.Crop);Column(Modifier.weight(1f)){Text(first.exerciseName,style=MiuixTheme.textStyles.title2);Text(if(hasActivity)"${sets.count{it.completed}} / ${sets.size} 组已完成" else "未开始 · ${sets.size} 组",color=MiuixTheme.colorScheme.onSurfaceSecondary)};if(dragging)Icon(MiuixIcons.Glass.Sort,"拖动排序",Modifier.size(22.dp))else{WorkoutCardMenu(first.exerciseName,onDetail,onDeleteExercise);Icon(if(expanded)MiuixIcons.Glass.ExpandLess else MiuixIcons.Glass.ExpandMore,if(expanded)"收起" else "展开",Modifier.size(22.dp))}}}
-    AnimatedVisibility(expanded,enter=expandVertically(folmeSpring(.9f,.32f))+fadeIn(folmeSpring(.9f,.28f)),exit=shrinkVertically(folmeSpring(.92f,.28f))+fadeOut(folmeSpring(.95f,.24f))){Column(verticalArrangement=Arrangement.spacedBy(8.dp)){sets.forEach{set->CompactSetRow(set,now,{onBegin(set.setId)},{onPause(set.setId)},{w,r->onComplete(set.setId,w,r)},{w,r->onEdit(set.setId,w,r)},{onDelete(set.setId)})};IconButton(onClick=onAdd,modifier=Modifier.align(Alignment.End)){Icon(MiuixIcons.Glass.Add,"添加一组",Modifier.size(22.dp))}}}
+    AnimatedVisibility(expanded,enter=expandVertically(folmeSpring(.9f,.32f))+fadeIn(folmeSpring(.9f,.28f)),exit=shrinkVertically(folmeSpring(.92f,.28f))+fadeOut(folmeSpring(.95f,.24f))){Column(verticalArrangement=Arrangement.spacedBy(8.dp)){sets.forEach{set->CompactSetRow(set,now,{onBegin(set.setId)},{onPause(set.setId)},{w,r->onComplete(set.setId,w,r)},{w,r->onEdit(set.setId,w,r)},{onDelete(set.setId)},revealControls=set.setId==revealSetId&&transition.currentState==EnterExitState.Visible,onControlsRevealed=onControlsRevealed)};IconButton(onClick=onAdd,modifier=Modifier.align(Alignment.End)){Icon(MiuixIcons.Glass.Add,"添加一组",Modifier.size(22.dp))}}}
 }}}
 
-@Composable private fun CompactSetRow(set:SessionSetRow,now:State<Long>,onBegin:()->Unit,onPause:()->Unit,onComplete:(Double,Int)->Unit,onEdit:(Double,Int)->Unit,onDelete:()->Unit,allowDelete:Boolean=true){var weight by rememberSaveable(set.setId){mutableStateOf(exactDecimal(set.weightKg))};var reps by rememberSaveable(set.setId){mutableStateOf(set.reps.toString())};var editing by rememberSaveable(set.setId){mutableStateOf(false)};val elapsed=if(set.completed)set.durationSeconds.toLong() else activeDurationSeconds(set.startedAt,if(set.startedAt==null)0 else set.pausedAt?:now.value,set.pausedAt,set.pausedDurationMillis);val active=set.startedAt!=null&&!set.completed;val paused=set.pausedAt!=null
+@Composable private fun CompactSetRow(set:SessionSetRow,now:State<Long>,onBegin:()->Unit,onPause:()->Unit,onComplete:(Double,Int)->Unit,onEdit:(Double,Int)->Unit,onDelete:()->Unit,allowDelete:Boolean=true,revealControls:Boolean=false,onControlsRevealed:()->Unit={}){var weight by rememberSaveable(set.setId){mutableStateOf(exactDecimal(set.weightKg))};var reps by rememberSaveable(set.setId){mutableStateOf(set.reps.toString())};var editing by rememberSaveable(set.setId){mutableStateOf(false)};val elapsed=if(set.completed)set.durationSeconds.toLong() else activeDurationSeconds(set.startedAt,if(set.startedAt==null)0 else set.pausedAt?:now.value,set.pausedAt,set.pausedDurationMillis);val active=set.startedAt!=null&&!set.completed;val paused=set.pausedAt!=null
     LaunchedEffect(active,editing,set.weightKg,set.reps){
         if(!active && !editing){
             weight=exactDecimal(set.weightKg)
             reps=set.reps.toString()
         }
     }
-    if(active||editing)Column(Modifier.fillMaxWidth().padding(vertical=4.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("第 ${set.setPosition+1} 组",style=MiuixTheme.textStyles.title3,modifier=Modifier.weight(1f));Text(if(active)"${if(paused)"已暂停" else "进行中"} · ${formatDuration(elapsed)}" else "修改记录",color=MiuixTheme.colorScheme.primary)};Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){TextField(weight,{weight=it;if(!editing)validWeight(it)?.let{w->validReps(reps)?.let{r->onEdit(w,r)}}},label="kg",keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),modifier=Modifier.weight(1f));TextField(reps,{reps=it;if(!editing)validReps(it)?.let{r->validWeight(weight)?.let{w->onEdit(w,r)}}},label="次数",keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),modifier=Modifier.weight(1f))};Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){if(editing)IconButton(enabled=validWeight(weight)!=null&&validReps(reps)!=null,onClick={onEdit(validWeight(weight)!!,validReps(reps)!!);editing=false}){Icon(MiuixIcons.Glass.Ok,"保存修改",Modifier.size(22.dp))}else{IconButton(onClick=if(paused)onBegin else onPause){Icon(if(paused)MiuixIcons.Glass.Play else MiuixIcons.Glass.Pause,if(paused)"继续本组" else "暂停本组",Modifier.size(22.dp))};IconButton(enabled=validWeight(weight)!=null&&validReps(reps)!=null,onClick={onComplete(validWeight(weight)!!,validReps(reps)!!)}){Icon(MiuixIcons.Glass.Ok,"完成本组",Modifier.size(22.dp))}};if(allowDelete)IconButton(onClick=onDelete){Icon(MiuixIcons.Glass.Delete,"删除本组",Modifier.size(22.dp))}}}
+    if(active||editing)Column(Modifier.fillMaxWidth().padding(vertical=4.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("第 ${set.setPosition+1} 组",style=MiuixTheme.textStyles.title3,modifier=Modifier.weight(1f));Text(if(active)"${if(paused)"已暂停" else "进行中"} · ${formatDuration(elapsed)}" else "修改记录",color=MiuixTheme.colorScheme.primary)};Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){TextField(weight,{weight=it;if(!editing)validWeight(it)?.let{w->validReps(reps)?.let{r->onEdit(w,r)}}},label="kg",keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),modifier=Modifier.weight(1f));TextField(reps,{reps=it;if(!editing)validReps(it)?.let{r->validWeight(weight)?.let{w->onEdit(w,r)}}},label="次数",keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),modifier=Modifier.weight(1f))};Row(Modifier.fillMaxWidth().revealWorkoutControls(active&&revealControls,onControlsRevealed),horizontalArrangement=Arrangement.End){if(editing)IconButton(enabled=validWeight(weight)!=null&&validReps(reps)!=null,onClick={onEdit(validWeight(weight)!!,validReps(reps)!!);editing=false}){Icon(MiuixIcons.Glass.Ok,"保存修改",Modifier.size(22.dp))}else{IconButton(onClick=if(paused)onBegin else onPause){Icon(if(paused)MiuixIcons.Glass.Play else MiuixIcons.Glass.Pause,if(paused)"继续本组" else "暂停本组",Modifier.size(22.dp))};IconButton(enabled=validWeight(weight)!=null&&validReps(reps)!=null,onClick={onComplete(validWeight(weight)!!,validReps(reps)!!)}){Icon(MiuixIcons.Glass.Ok,"完成本组",Modifier.size(22.dp))}};if(allowDelete)IconButton(onClick=onDelete){Icon(MiuixIcons.Glass.Delete,"删除本组",Modifier.size(22.dp))}}}
     else Row(Modifier.fillMaxWidth().padding(vertical=6.dp),verticalAlignment=Alignment.CenterVertically){Text("第 ${set.setPosition+1} 组",style=MiuixTheme.textStyles.title3,modifier=Modifier.width(72.dp));Column(Modifier.weight(1f)){Text("${displayDecimal(set.weightKg)} kg × ${set.reps} 次");Text(if(set.completed)"已完成 · ${formatDuration(elapsed)}${if(set.restDurationSeconds>0)" · 休息 ${formatDuration(set.restDurationSeconds.toLong())}" else ""}" else "未开始",style=MiuixTheme.textStyles.footnote1,color=if(set.completed)MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceSecondary)};IconButton(onClick={weight=exactDecimal(set.weightKg);reps=set.reps.toString();editing=true}){Icon(MiuixIcons.Glass.Edit,if(set.completed)"编辑本组" else "训练前调整重量和次数",Modifier.size(22.dp))};if(!set.completed)IconButton(onClick=onBegin){Icon(MiuixIcons.Glass.Play,"开始本组",Modifier.size(22.dp))};if(allowDelete)IconButton(onClick=onDelete){Icon(MiuixIcons.Glass.Delete,"删除本组",Modifier.size(22.dp))}};HorizontalDivider()
 }
 
@@ -511,13 +522,36 @@ fun minutesToSeconds(minutes:String)=((validWeight(minutes)?:0.0)*60).coerceAtMo
 fun cardioSummary(record:SessionSetRow):String=buildString{append(formatDuration(record.durationSeconds.toLong()));if(record.distanceKm>0)append(" · ${displayDecimal(record.distanceKm)} km");if(record.distanceKm>0&&record.durationSeconds>0){val pace=record.durationSeconds/60.0/record.distanceKm;append(" · ${pace.toInt()}:${((pace%1)*60).toInt().toString().padStart(2,'0')} /km")}}
 
 @Composable
-private fun WorkoutRestToolbar(rows:List<SessionSetRow>,now:State<Long>,onBegin:(Long)->Unit){
-    val rest=rows.lastOrNull{it.restStartedAt!=null&&it.restEndedAt==null}
+private fun Modifier.revealWorkoutControls(reveal: Boolean, onRevealed: () -> Unit): Modifier {
+    if (!reveal) return this
+    val requester = remember { BringIntoViewRequester() }
+    var size by remember { mutableStateOf(IntSize.Zero) }
+    val density = LocalDensity.current
+    val bottomClearance = WindowInsets.navigationBars.getBottom(density) + with(density) { 12.dp.toPx() }
+    val currentOnRevealed by rememberUpdatedState(onRevealed)
+    LaunchedEffect(size, bottomClearance) {
+        if (size.height > 0) {
+            requester.bringIntoView(Rect(0f, 0f, size.width.toFloat(), size.height + bottomClearance))
+            currentOnRevealed()
+        }
+    }
+    return bringIntoViewRequester(requester).onGloballyPositioned { size = it.size }
+}
+
+@Composable
+private fun WorkoutRestToolbar(
+    rows: List<SessionSetRow>,
+    now: State<Long>,
+    finished: Boolean,
+    isFloating: () -> Boolean,
+    onBegin: (Long) -> Unit,
+) {
+    val rest = if (finished) null else rows.lastOrNull { it.restStartedAt != null && it.restEndedAt == null }
     AnimatedVisibility(rest!=null,enter=fadeIn(folmeSpring(.9f,.28f))+expandVertically(folmeSpring(.9f,.32f)),exit=fadeOut(folmeSpring(.95f,.24f))+shrinkVertically(folmeSpring(.92f,.28f))){rest?.let{
         val elapsed=((now.value-it.restStartedAt!!)/1000).coerceAtLeast(0)
         val remaining=(it.restSeconds-elapsed).coerceAtLeast(0)
         HeroCard(if(remaining>0)"组间休息 ${formatDuration(remaining)}" else "休息结束",
             "上一组 ${formatDuration(it.durationSeconds.toLong())} · 已休息 ${formatDuration(elapsed)}",
-            "开始下一项",{nextWorkoutSet(rows,it.setId)?.let{next->onBegin(next.setId)}},floating=true)
+            "开始下一项",{nextWorkoutSet(rows,it.setId)?.let{next->onBegin(next.setId)}},floating=isFloating())
     }}
 }

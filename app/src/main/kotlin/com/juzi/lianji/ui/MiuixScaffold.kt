@@ -27,7 +27,6 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SearchBar
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.basic.ToolbarPosition
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
@@ -46,8 +45,7 @@ fun MiuixPageScaffold(
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
-    floatingToolbar: @Composable () -> Unit = {},
-    floatingToolbarPosition: ToolbarPosition = ToolbarPosition.BottomCenter,
+    topBarBottomContent: @Composable () -> Unit = {},
     titleProvider: (() -> String)? = null,
     scrollBehavior: ScrollBehavior? = null,
     overlay: (@Composable BoxScope.(Backdrop?) -> Unit)? = null,
@@ -99,11 +97,10 @@ fun MiuixPageScaffold(
                         stroke = rememberOs4EdgeStroke(GlassTopAppBarDefaults.buttonStroke()),
                         navigationIcon = navigationIcon,
                         actions = actions,
+                        bottomContent = topBarBottomContent,
                     )
                 },
                 bottomBar = bottomBar,
-                floatingToolbar = floatingToolbar,
-                floatingToolbarPosition = floatingToolbarPosition,
             ) { padding ->
                 Box(Modifier.fillMaxSize()) {
                     Box(

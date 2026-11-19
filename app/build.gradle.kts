@@ -29,8 +29,8 @@ android {
         applicationId = "com.juzi.lianji"
         minSdk = 35
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.2.2"
+        versionCode = 5
+        versionName = "0.2.3"
         testInstrumentationRunner = "com.juzi.lianji.RegressionTestRunner"
     }
     experimentalProperties["android.experimental.r8.dex-startup-optimization"] = true

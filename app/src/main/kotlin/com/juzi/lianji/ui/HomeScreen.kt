@@ -248,6 +248,7 @@ fun HeroCard(title: String, subtitle: String, button: String, onClick: () -> Uni
     if (floating) {
         GlassFloatingToolbar(
             modifier = Modifier.fillMaxWidth(),
+            outSidePadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 12.dp),
             backdrop = LocalPageBackdrop.current,
             style = rememberOs4GlassStyle(),
             material = rememberOs4CustomMaterial() ?: GlassFloatingToolbarDefaults.material(),

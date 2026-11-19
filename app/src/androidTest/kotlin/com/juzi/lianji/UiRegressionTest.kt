@@ -89,6 +89,46 @@ class UiRegressionTest {
         assertTrue(card("Blur0").fetchSemanticsNode().boundsInRoot.top < backBottom)
     }
 
+    @Test fun rest_action_stays_at_top_and_reveals_the_last_set_without_a_large_blank_tail() {
+        val names = (1..16).map { "Rest$it" }
+        val sessionId = workout(names)
+        runBlocking {
+            val last = vm.repository.rows(sessionId).first().last()
+            repeat(9) { vm.repository.addSet(last.sessionExerciseId, it + 1, 0.0, 10) }
+            val lastSets = vm.repository.rows(sessionId).first().filter { it.sessionExerciseId == last.sessionExerciseId }
+            lastSets.dropLast(1).forEach {
+                vm.repository.beginSet(it.setId)
+                vm.repository.completeSet(it.setId, 0.0, 10)
+            }
+            vm.repository.reorderExercises(sessionId, vm.repository.rows(sessionId).first()
+                .map { it.sessionExerciseId }.distinct().filterNot { it == last.sessionExerciseId } + last.sessionExerciseId)
+        }
+        compose.setContent { LianJiTheme(AppSettings(dynamicColor=false)) { WorkoutScreen(vm,sessionId,{},{},{}) } }
+        awaitText("开始下一项")
+        val next = compose.onNodeWithText("开始下一项")
+        val restTop = next.fetchSemanticsNode().boundsInRoot.top
+        val backBottom = compose.onNodeWithContentDescription("返回").fetchSemanticsNode().boundsInRoot.bottom
+        assertTrue(restTop >= backBottom)
+
+        val list = compose.onNodeWithTag("workout-exercises")
+        list.performScrollToIndex(names.lastIndex)
+        compose.onNodeWithText(names.last()).performClick()
+        list.performScrollToIndex(names.lastIndex)
+        val listBottom = list.fetchSemanticsNode().boundsInRoot.bottom
+        val lastBottom = card(names.last()).fetchSemanticsNode().boundsInRoot.bottom
+        assertTrue(listBottom - lastBottom < with(compose.density) { 120.dp.toPx() })
+        assertEquals(restTop, next.fetchSemanticsNode().boundsInRoot.top, 1f)
+
+        next.performClick()
+        val finish = compose.onNodeWithContentDescription("完成本组")
+        compose.waitUntil(10_000) {
+            val bounds = compose.onAllNodesWithContentDescription("完成本组").fetchSemanticsNodes().singleOrNull()?.boundsInRoot
+            bounds != null && bounds.top >= backBottom && bounds.bottom < listBottom && bounds.height > 0f
+        }
+        finish.assertIsDisplayed()
+        next.assertDoesNotExist()
+    }
+
     @Test fun dragging_visible_first_card_keeps_viewport_and_expanded_height() {
         val sessionId=workout((0..15).map { "Move$it" })
         compose.setContent { LianJiTheme(AppSettings(dynamicColor=false)) { WorkoutScreen(vm,sessionId,{},{},{}) } }
