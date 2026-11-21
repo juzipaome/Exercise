@@ -4,8 +4,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -44,7 +45,7 @@ fun WorkoutHomeScreen(
     onSchedule: (Long, LocalDate) -> Unit = { _, _ -> },
 ) {
     var schedulingPlan by remember { mutableStateOf<PlanSummary?>(null) }
-    var scheduleDateInput by rememberSaveable { mutableStateOf("") }
+    val scheduleDateState = rememberTextFieldState()
     val layoutDirection = LocalLayoutDirection.current
     LazyColumn(
         Modifier
@@ -91,7 +92,7 @@ fun WorkoutHomeScreen(
                         PlanMoreMenu(
                             onEdit = { onEdit(plan.id) },
                             onSchedule = {
-                                scheduleDateInput = LocalDate.now().plusDays(1).toString()
+                                scheduleDateState.setTextAndPlaceCursorAtEnd(LocalDate.now().plusDays(1).toString())
                                 schedulingPlan = plan
                             },
                             onDuplicate = { onDuplicate(plan.id) },
@@ -107,13 +108,14 @@ fun WorkoutHomeScreen(
         title = "安排「${schedulingPlan?.name.orEmpty()}」",
         onDismissRequest = { schedulingPlan = null },
     ) {
+        val scheduleDateInput = scheduleDateState.text.toString()
         val today = LocalDate.now()
         val quickDates = listOf("今天" to today, "明天" to today.plusDays(1), "后天" to today.plusDays(2))
         val quickIndex = quickDates.indexOfFirst { it.second.toString() == scheduleDateInput.trim() }
         GlassTabRow(
             tabs = quickDates.map { it.first },
             selectedIndex = quickIndex.coerceAtLeast(0),
-            onSelect = { scheduleDateInput = quickDates[it].second.toString() },
+            onSelect = { scheduleDateState.setTextAndPlaceCursorAtEnd(quickDates[it].second.toString()) },
             backdrop = LocalRootBackdrop.current ?: LocalSurfaceBackdrop.current,
             modifier = Modifier.fillMaxWidth(),
             style = rememberOs4GlassStyle(),
@@ -121,9 +123,8 @@ fun WorkoutHomeScreen(
             stroke = rememberOs4EdgeStroke(GlassTabRowDefaults.stroke()),
             colors = if (quickIndex >= 0) GlassTabRowDefaults.primaryColors() else GlassTabRowDefaults.neutralColors(),
         )
-        TextField(
-            value = scheduleDateInput,
-            onValueChange = { scheduleDateInput = it },
+        SheetTextField(
+            state = scheduleDateState,
             label = "训练日期 YYYY-MM-DD",
             useLabelAsPlaceholder = true,
             modifier = Modifier.fillMaxWidth(),

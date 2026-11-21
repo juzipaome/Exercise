@@ -585,7 +585,7 @@ private fun MainTabs(
     }
 }
 
-/** Kept in sync with the MainPagerState shipped in the MIUIX 0.9.5-beta01 example app. */
+/** Kept in sync with the MainPagerState shipped in the MIUIX 0.9.5-beta02 example app. */
 @Stable
 private class MainPagerState(
     val pagerState: PagerState,

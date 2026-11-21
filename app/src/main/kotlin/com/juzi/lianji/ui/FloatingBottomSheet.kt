@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -17,12 +19,14 @@ import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.glass.GlassBottomSheet
 import top.yukonga.miuix.kmp.glass.GlassBottomSheetDefaults
 import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.glass.GlassDialogButton
 import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
 import top.yukonga.miuix.kmp.glass.GlassDialogDefaults
+import top.yukonga.miuix.kmp.glass.GlassTextField
 import top.yukonga.miuix.kmp.theme.LocalDismissState
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
@@ -145,5 +149,36 @@ fun MiuixActionDialog(
                 )
             }
         }
+    }
+}
+
+/**
+ * Text field tailored for [FloatingBottomSheet], using OS4 [GlassTextField] over frosted
+ * glass surfaces and falling back to [TextField] in standalone test harnesses.
+ */
+@Composable
+fun SheetTextField(
+    state: TextFieldState,
+    label: String,
+    modifier: Modifier = Modifier,
+    useLabelAsPlaceholder: Boolean = false,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+) {
+    if (LocalHasRootScaffold.current) {
+        GlassTextField(
+            state = state,
+            modifier = modifier,
+            label = label,
+            useLabelAsPlaceholder = useLabelAsPlaceholder,
+            keyboardOptions = keyboardOptions,
+        )
+    } else {
+        TextField(
+            state = state,
+            modifier = modifier,
+            label = label,
+            useLabelAsPlaceholder = useLabelAsPlaceholder,
+            keyboardOptions = keyboardOptions,
+        )
     }
 }

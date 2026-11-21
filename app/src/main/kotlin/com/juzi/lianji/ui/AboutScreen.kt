@@ -49,7 +49,8 @@ fun AboutScreen(onBack:()->Unit) {
     val listState=rememberLazyListState()
     val scrollBehavior=MiuixScrollBehavior()
     val collapseDistance=with(LocalDensity.current){220.dp.toPx()}
-    val scrollProgress by remember { derivedStateOf { if(listState.firstVisibleItemIndex>0)1f else (listState.firstVisibleItemScrollOffset/collapseDistance).coerceIn(0f,1f) } }
+    val scrollProgress by remember { computedStateOf { if(listState.firstVisibleItemIndex>0)1f else (listState.firstVisibleItemScrollOffset/collapseDistance).coerceIn(0f,1f) } }
+    val contentUnderTopBar by remember(listState) { computedStateOf { listState.canScrollBackward } }
     val surface=MiuixTheme.colorScheme.surface
     val dark=surface.luminance()<.5f
     val settings = LocalMiuixFeatureSettings.current
@@ -59,6 +60,7 @@ fun AboutScreen(onBack:()->Unit) {
     Scaffold(topBar={
         GlassTopAppBar(
             title="关于",
+            isContentScrolled=contentUnderTopBar,
             expandable=false,
             progressiveBlur=settings.progressiveBlur && backdrop != null,
             backdrop=backdrop,
@@ -100,7 +102,7 @@ fun AboutScreen(onBack:()->Unit) {
                 item(key="sources"){
                     AboutGlassCard(backdrop,dark){
                         ArrowPreference(title="动作数据",summary="hasaneyldrm/exercises-dataset",endActions={AboutValue("MIT")},onClick={uriHandler.openUri("https://github.com/hasaneyldrm/exercises-dataset")})
-                        ArrowPreference(title="界面框架",summary="Miuix for Compose",endActions={AboutValue("0.9.5-beta01")},onClick={uriHandler.openUri("https://github.com/compose-miuix-ui/miuix")})
+                        ArrowPreference(title="界面框架",summary="Miuix for Compose",endActions={AboutValue("0.9.5-beta02")},onClick={uriHandler.openUri("https://github.com/compose-miuix-ui/miuix")})
                     }
                 }
                 item(key="privacy"){
@@ -112,7 +114,7 @@ fun AboutScreen(onBack:()->Unit) {
                     }
                 }
             }
-            VerticalScrollBar(rememberScrollBarAdapter(listState),Modifier.align(Alignment.CenterEnd).fillMaxHeight(),trackPadding=padding)
+            VerticalScrollBar(rememberScrollBarAdapter(listState),Modifier.align(Alignment.CenterEnd).fillMaxHeight(),trackPadding=padding,topAppBarScrollBehavior=scrollBehavior)
         }
     }
 }

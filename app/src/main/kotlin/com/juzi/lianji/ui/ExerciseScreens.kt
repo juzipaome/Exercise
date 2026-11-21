@@ -11,6 +11,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -38,6 +40,7 @@ import top.yukonga.miuix.kmp.glass.GlassFloatingActionButton
 import top.yukonga.miuix.kmp.glass.GlassFloatingActionButtonDefaults
 import top.yukonga.miuix.kmp.glass.GlassSegmentedTabRow
 import top.yukonga.miuix.kmp.glass.GlassSegmentedTabRowDefaults
+import top.yukonga.miuix.kmp.glass.GlassTextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.Back
 import top.yukonga.miuix.kmp.icon.glass.Edit
@@ -62,7 +65,7 @@ fun ExerciseLibraryScreen(state:MainUiState,padding:PaddingValues,listState:Lazy
     }
     val scope = rememberCoroutineScope()
     val layoutDirection = LocalLayoutDirection.current
-    val showScrollTopFab by remember { derivedStateOf { listState.firstVisibleItemIndex > 6 } }
+    val showScrollTopFab by remember { computedStateOf { listState.firstVisibleItemIndex > 6 } }
     val customMaterial = rememberOs4CustomMaterial()
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
@@ -108,6 +111,7 @@ fun ExerciseLibraryScreen(state:MainUiState,padding:PaddingValues,listState:Lazy
             adapter = rememberScrollBarAdapter(listState),
             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
             trackPadding = padding,
+            topAppBarScrollBehavior = scrollBehavior,
         )
         AnimatedVisibility(
             visible = showScrollTopFab,
@@ -174,7 +178,10 @@ fun ExerciseDetailScreen(vm:MainViewModel,id:String,onBack:()->Unit){
 
 @Composable
 private fun ExerciseRenameSheet(show:Boolean,currentName:String,datasetName:String,canRestore:Boolean,onDismiss:()->Unit,onSave:(String)->Job,onRestore:()->Job){
-    var name by remember(show,currentName){mutableStateOf(currentName)}
+    val nameState = remember { TextFieldState(currentName) }
+    LaunchedEffect(show, currentName) {
+        if (show) nameState.setTextAndPlaceCursorAtEnd(currentName)
+    }
     var saving by remember{mutableStateOf(false)}
     val scope=rememberCoroutineScope()
     fun save(action:()->Job) {
@@ -196,8 +203,9 @@ private fun ExerciseRenameSheet(show:Boolean,currentName:String,datasetName:Stri
             stroke = rememberOs4EdgeStroke(GlassDialogDefaults.stroke()),
         ) {
             val dismissState = LocalDismissState.current
+            val trimmedName = nameState.text.toString().trim()
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                TextField(name, { name = it }, label = "中文显示名", modifier = Modifier.fillMaxWidth())
+                GlassTextField(state = nameState, label = "中文显示名", modifier = Modifier.fillMaxWidth())
                 if (canRestore && datasetName.isNotBlank() && currentName != datasetName) {
                     GlassDialogButton(
                         onClick = { save(onRestore) },
@@ -215,8 +223,8 @@ private fun ExerciseRenameSheet(show:Boolean,currentName:String,datasetName:Stri
                         Text("取消", style = MiuixTheme.textStyles.button)
                     }
                     GlassDialogButton(
-                        onClick = { save { onSave(name.trim()) } },
-                        enabled = !saving && name.trim().isNotEmpty(),
+                        onClick = { save { onSave(trimmedName) } },
+                        enabled = !saving && trimmedName.isNotEmpty(),
                         role = GlassDialogButtonRole.Primary,
                         modifier = Modifier.weight(1f),
                     ) {
@@ -228,12 +236,13 @@ private fun ExerciseRenameSheet(show:Boolean,currentName:String,datasetName:Stri
     } else {
         WindowDialog(show = show, title = "修改动作中文名", summary = "已有训练历史仍保留当时的名称。", onDismissRequest = onDismiss, largeScreen = settings.largeScreenDialogs) {
             val dismissState = LocalDismissState.current
+            val trimmedName = nameState.text.toString().trim()
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                TextField(name, { name = it }, label = "中文显示名", modifier = Modifier.fillMaxWidth())
+                TextField(state = nameState, label = "中文显示名", modifier = Modifier.fillMaxWidth())
                 if (canRestore && datasetName.isNotBlank() && currentName != datasetName) TextButton("恢复数据集原名", enabled = !saving, onClick = { save(onRestore) }, modifier = Modifier.fillMaxWidth())
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                     TextButton("取消", onClick = { (dismissState ?: onDismiss).invoke() }, modifier = Modifier.weight(1f))
-                    TextButton(if (saving) "正在保存…" else "保存", enabled = !saving && name.trim().isNotEmpty(), onClick = { save { onSave(name.trim()) } }, colors = ButtonDefaults.textButtonColorsPrimary(), modifier = Modifier.weight(1f))
+                    TextButton(if (saving) "正在保存…" else "保存", enabled = !saving && trimmedName.isNotEmpty(), onClick = { save { onSave(trimmedName) } }, colors = ButtonDefaults.textButtonColorsPrimary(), modifier = Modifier.weight(1f))
                 }
             }
         }

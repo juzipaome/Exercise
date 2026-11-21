@@ -370,6 +370,7 @@ private fun SettingsList(
             adapter = rememberScrollBarAdapter(listState),
             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
             trackPadding = padding,
+            topAppBarScrollBehavior = scrollBehavior,
         )
     }
 }

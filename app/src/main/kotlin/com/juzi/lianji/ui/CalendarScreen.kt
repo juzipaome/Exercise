@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -24,6 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.juzi.lianji.MainViewModel
 import com.juzi.lianji.data.*
 import top.yukonga.miuix.kmp.basic.*
+import top.yukonga.miuix.kmp.glass.GlassTextFieldDefaults
 import top.yukonga.miuix.kmp.squircle.squircleBorder
 import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.squircle.squircleSurface
@@ -240,8 +242,8 @@ fun DayDetailScreen(
     var selectedPlanName by remember { mutableStateOf("") }
     var planExerciseIds by remember { mutableStateOf<List<String>>(emptyList()) }
     var selectedExerciseIds by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var startTime by remember { mutableStateOf("18:00") }
-    var endTime by remember { mutableStateOf("19:00") }
+    val startTimeState = remember { TextFieldState("18:00") }
+    val endTimeState = remember { TextFieldState("19:00") }
     var cardioDistances by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var cardioDurations by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     val untilDate = remember(date) { LocalDate.parse(date).plusDays(1).toString() }
@@ -346,13 +348,15 @@ fun DayDetailScreen(
                 ){Text("下一步")}
             }
         } else {
+            val startTime = startTimeState.text.toString()
+            val endTime = endTimeState.text.toString()
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(selectedPlanName,style=MiuixTheme.textStyles.title3);Text("选择实际完成的动作",color=MiuixTheme.colorScheme.onSurfaceSecondary)};TextButton("重选计划",onClick={selectedPlanId=null})}
             planExerciseIds.forEach { id -> state.exercises.firstOrNull{it.id==id}?.let { exercise ->
                 val checked=id in selectedExerciseIds
                 val toggle = hapticRowClick(checked) {
                     selectedExerciseIds = if (checked) selectedExerciseIds - id else selectedExerciseIds + id
                 }
-                // MIUIX 0.9.5-beta01 sends its own toggle feedback only for the circle.
+                // MIUIX 0.9.5-beta02 sends its own toggle feedback only for the circle.
                 CompositionLocalProvider(LocalHapticFeedback provides NoHapticFeedback) {
                     CheckboxPreference(
                         title = exercise.nameZh,
@@ -366,10 +370,16 @@ fun DayDetailScreen(
                 if(checked&&exercise.trackingMode==TrackingMode.CARDIO) {
                     val selectedCardioCount=selectedExerciseIds.count{selectedId->state.exercises.firstOrNull{it.id==selectedId}?.trackingMode==TrackingMode.CARDIO}
                     val defaultDurationMinutes = if(selectedCardioCount==1)parseTimeMinute(startTime)?.let { start -> parseTimeMinute(endTime)?.takeIf{it>start}?.let { end -> pastWorkoutTimeRange(LocalDate.parse(date),start,end).durationSeconds/60.0 } } else null
+                    val fieldColors = if (LocalHasRootScaffold.current) {
+                        GlassTextFieldDefaults.textFieldColors()
+                    } else {
+                        TextFieldDefaults.textFieldColors()
+                    }
                     Row(Modifier.fillMaxWidth().padding(horizontal=12.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                         TextField(
                             value=cardioDurations[id] ?: defaultDurationMinutes?.let(::displayDecimal).orEmpty(),
                             onValueChange={cardioDurations=cardioDurations+(id to it)},
+                            colors=fieldColors,
                             label="时长（分钟）",
                             keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),
                             modifier=Modifier.weight(1f),
@@ -377,6 +387,7 @@ fun DayDetailScreen(
                         TextField(
                             value=cardioDistances[id].orEmpty(),
                             onValueChange={cardioDistances=cardioDistances+(id to it)},
+                            colors=fieldColors,
                             label="距离（km，可选）",
                             keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),
                             modifier=Modifier.weight(1f),
@@ -386,7 +397,10 @@ fun DayDetailScreen(
             } }
             HorizontalDivider()
             Text("训练时间",style=MiuixTheme.textStyles.title3)
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)){TextField(startTime,{startTime=it},label="开始 HH:mm",useLabelAsPlaceholder=true,modifier=Modifier.weight(1f));TextField(endTime,{endTime=it},label="结束 HH:mm",useLabelAsPlaceholder=true,modifier=Modifier.weight(1f))}
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)){
+                SheetTextField(startTimeState, label = "开始 HH:mm", useLabelAsPlaceholder = true, modifier = Modifier.weight(1f))
+                SheetTextField(endTimeState, label = "结束 HH:mm", useLabelAsPlaceholder = true, modifier = Modifier.weight(1f))
+            }
             val startMinute=parseTimeMinute(startTime);val endMinute=parseTimeMinute(endTime)
             val validTime=startMinute!=null&&endMinute!=null&&endMinute>startMinute
             val selectedCardioIds=selectedExerciseIds.filter{id->state.exercises.firstOrNull{it.id==id}?.trackingMode==TrackingMode.CARDIO}.toSet()
